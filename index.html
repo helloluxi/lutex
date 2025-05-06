@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time LaTeX Renderer</title>
+    <link rel="icon" href="data:,">
+    <script src="bibtexParse.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']],
+                macros: {
+                    abs: ["\\left| #1 \\right|", 1],
+                    ket: ["\\left| #1 \\right\\rangle", 1],
+                    bra: ["\\left\\langle #1 \\right|", 1],
+                    ip: ["\\left\\langle #1 \\middle| #2 \\right\\rangle", 2],
+                    dyad: ["\\left| #1 \\right\\rangle \\! \\left\\langle #2 \\right|", 2],
+                    mel: ["\\left\\langle #1 \\middle| #2 \\middle| #3 \\right\\rangle", 3],
+                    Q: "\\hat{Q}",
+                    P: "\\hat{P}",
+                    q: "\\hat{q}",
+                    p: "\\hat{p}",
+                    a: "\\hat{a}",
+                    ad: "\\hat{a}^\\dagger",
+                    b: "\\hat{b}",
+                    bd: "\\hat{b}^\\dagger",
+                    c: "\\hat{c}",
+                    cd: "\\hat{c}^\\dagger",
+                    y: "\\hat{y}",
+                    yp: "\\hat{y}^{\\perp}",
+                    n: "\\hat{n}",
+                    sx: "\\sigma_x",
+                    sy: "\\sigma_y",
+                    sz: "\\sigma_z",
+                    tg: "\\tilde{g}",
+                    C: "\\mathbb{C}",
+                    R: "\\mathbb{R}",
+                    Z: "\\mathbb{Z}",
+                    E: ["\\mathcal{E}\\left( #1 \\right)", 1],
+                    D: ["\\mathcal{D}\\left( #1 \\right)", 1],
+                    cdsub: ["\\mathcal{CD}_{#1}\\left( #2 \\right)", 2],
+                    CD: ["\\mathcal{CD}\\left( #1 \\right)", 1],
+                    tD: ["\\tilde{\\mathcal{D}}\\left( #1 \\right)", 1],
+                    tCD: ["\\widetilde{\\mathcal{CD}}\\left( #1 \\right)", 1],
+                    S: ["\\mathcal{S}\\left( #1 \\right)", 1],
+                    G: "\\mathcal{G}",
+                    K: "\\mathcal{K}",
+                    N: "\\mathcal{N}",
+                    RR: ["\\mathcal{R}\\left( #1 \\right)", 1],
+                    BS: ["\\mathcal{BS}\\left( #1 \\right)", 1],
+                    JC: ["\\mathcal{JC}\\left( #1 \\right)", 1],
+                    CP: "\\mathcal{CP}",
+                    F: "\\mathcal{F}",
+                    tr: "\\text{Tr}",
+                    dd: "\\mathrm{d}",
+                    w: "\\hat{w}",
+                    v: "\\hat{v}",
+                    x: "\\hat{x}",
+                    y: "\\hat{y}",
+                    h: "\\hat{H}",
+                    O: "\\hat{O}",
+                    H: "\\hat{H}",
+                    W: "\\mathcal{W}",
+                    inv: "^{-1}",
+                    z: "\\mathbf{z}",
+                    r: "\\mathbf{r}",
+                    m: "\\mathbf{m}",
+                    nm: ["\\left\\| #1 \\right\\|_{\\infty}", 1],
+                    bmzeta: "\\mathbf{\\zeta}",
+                    eps: "\\varepsilon",
+                    hft: "\\frac{\\theta}{2}",
+                    tpsi: "\\tilde{\\psi}",
+                    tq: "\\tilde{q}",
+                    tp: "\\tilde{p}",
+                    bj: "\\overline{j}",
+                    bk: "\\overline{k}",
+                    bq: "\\overline{q}",
+                    bp: "\\overline{p}",
+                    hf: ["\\frac{#1}{2}", 1],
+                    hfth: "\\frac{\\theta}{2}",
+                    qtth: "\\frac{\\theta}{4}",
+                    bma: "\\mathbf{\\alpha}",
+                    bmz: "\\mathbf{z}",
+                    bmmu: "\\mathbf{\\mu}",
+                    bmsg: "\\mathbf{\\Sigma}",
+                    ketq: ["\\left| #1 \\right\\rangle_Q", 1],
+                    ketp: ["\\left| #1 \\right\\rangle_P", 1],
+                    keta: ["\\left| #1 \\right\\rangle_C", 1],
+                    ketf: ["\\left| #1 \\right\\rangle_F", 1],
+                    braq: ["{}_Q\\!\\left\\langle #1 \\right|", 1],
+                    brap: ["{}_P\\!\\left\\langle #1 \\right|", 1],
+                    braa: ["{}_C\\!\\left\\langle #1 \\right|", 1],
+                    braf: ["{}_F\\!\\left\\langle #1 \\right|", 1],
+                    dyadcc: ["\\left| #1 \\right\\rangle_{c\\,c}\\left\\langle #1 \\right|", 1],
+                    L: "\\mathcal{L}",
+                    O: ["\\mathcal{O}\\left( #1 \\right)", 1],
+                    cip: ["{}_C\\!\\left\\langle #1 \\middle| #2 \\right\\rangle", 2],
+                    cipc: ["{}_C\\!\\left\\langle #1 \\middle| #2 \\right\\rangle_C", 2],
+                    cmel: ["{}_C\\!\\left\\langle #1 \\middle| #2 \\middle| #3 \\right\\rangle", 3],
+                    ipc: ["\\left\\langle #1 \\middle| #2 \\right\\rangle_C", 2],
+                    set: [ "\\left\\{ #1 \\right\\}", 1],
+                    norm: ["\\left\\| #1 \\right\\|", 1],
+                    pp: ["\\left( #1 \\right)", 1],
+                    bb: ["\\left[ #1 \\right]", 1],
+                    ppp: ["\\frac{\\partial^2}{\\partial {#1} ^2}", 1],
+                    nn: "\\nonumber",
+                    sqtw: "\\sqrt{2}",
+                    sqhf: ["\\frac{#1}{\\sqrt{2}}", 1],
+                    dag: "\\dagger",
+                    Re: "\\mathrm{Re}",
+                    Im: "\\mathrm{Im}",
+                    tj: "\\tilde{j}",
+                    tk: "\\tilde{k}",
+                    ts: "\\tilde{s}",
+                    tt: "\\tilde{t}",
+                    tE: "\\tilde{E}",
+                    bm: ["\\mathbf{#1}", 1],
+                    QFT: "\\widetilde{QFT}",
+                    sinc: "\\mathrm{sinc}",
+                    Enc: "\\mathrm{Enc}",
+                    Dec: "\\mathrm{Dec}",
+                    splus: "\\sigma_+",
+                    sminus: "\\sigma_-",
+                },
+                tags: 'ams',
+                tagSide: 'right',
+                tagIndent: '0.8em',
+                useLabelIds: true,
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+            },
+        };
+    </script>
+    <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            /* Dark theme colors */
+            --bg-dark: #1a1a1a;
+            --text-dark: #ffffff;
+            --accent-dark: #4a9eff;
+            --accent-dark-hover: #80cfff;
+            --accent-dark-transparent: rgba(74, 158, 255, 0.1);
+            --accent-dark-border: rgba(74, 158, 255, 0.3);
+            --code-bg-dark: #2d2d2d;
+            --caption-dark: #cccccc;
+            --table-header-dark: #2d2d2d;
+            --strong-dark: #80cfff;
+            
+            /* Light theme colors */
+            --bg-light: #ffffff;
+            --text-light: #1a1a1a;
+            --accent-light: #4a9eff;
+            --accent-light-hover: #80cfff;
+            --accent-light-transparent: rgba(74, 158, 255, 0.1);
+            --accent-light-border: rgba(74, 158, 255, 0.3);
+            --code-bg-light: #f0f0f0;
+            --caption-light: #666666;
+            --table-header-light: #e6f0ff;
+            --strong-light: #2332ff;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-dark);
+            font-family: Georgia, serif;
+            font-size: 20px;
+            line-height: 1.8;
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        body.light-theme {
+            background-color: var(--bg-light);
+            color: var(--text-light);
+        }
+        body.light-theme .MathJax {
+            color: var(--text-light);
+        }
+        body.light-theme code {
+            background-color: var(--code-bg-light);
+        }
+        body.light-theme pre {
+            background-color: var(--code-bg-light);
+        }
+        body.light-theme .theorem {
+            background-color: var(--code-bg-light);
+        }
+        body.light-theme .abstract {
+            background-color: var(--code-bg-light);
+        }
+        body.light-theme .toc-container {
+            background-color: rgba(240, 240, 240, 0.95);
+        }
+        body.light-theme .toc-link {
+            color: var(--text-light);
+        }
+        body.light-theme .toc-link:hover {
+            color: var(--accent-light);
+        }
+        body.light-theme .tooltip {
+            background-color: var(--code-bg-light);
+            color: var(--text-light);
+        }
+        body.light-theme .proof-panel {
+            background-color: var(--code-bg-light);
+        }
+        body.light-theme .figure-caption {
+            color: var(--caption-light);
+        }
+        body.light-theme .figure-caption .MathJax {
+            color: var(--caption-light) !important;
+        }
+        body.light-theme .table-caption {
+            color: var(--caption-light);
+        }
+        body.light-theme .table-caption .MathJax {
+            color: var(--caption-light) !important;
+        }
+        body.light-theme .MathJax table tr:first-child td {
+            background-color: var(--table-header-light);
+            color: var(--text-light);
+        }
+        body.light-theme .MathJax table tr:first-child td:first-child {
+            background-color: var(--table-header-light);
+            color: var(--text-light);
+        }
+        strong, em {
+            color: var(--strong-dark);
+        }
+        body.light-theme strong, body.light-theme em {
+            color: var(--strong-light);
+        }
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: var(--accent-dark);
+            text-align: center;
+            padding-bottom: 10px;
+        }
+        .MathJax {
+            color: var(--text-dark);
+        }
+        a {
+            color: var(--accent-dark);
+        }
+        code {
+            background-color: var(--code-bg-dark);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        pre {
+            background-color: var(--code-bg-dark);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .theorem {
+            background-color: var(--code-bg-dark);
+            border-left: 4px solid var(--accent-dark);
+            padding: 10px;
+            margin: 10px 0;
+            font-style: italic;
+        }
+        .author {
+            text-align: center;
+            font-size: 1em;
+            margin: 0;
+            padding: 0;
+        }
+        .affiliation {
+            text-align: center;
+            font-style: italic;
+            font-size: 1em;
+            margin: 0;
+            padding: 0;
+            white-space: pre-line;
+        }
+        .abstract {
+            background-color: var(--code-bg-dark);
+            padding: 20px;
+            margin: 20px 0;
+            text-align: justify;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+            text-indent: 2em;
+            border-radius: 20px;
+        }
+        .figure {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .figure-caption {
+            margin-top: 10px;
+            font-style: italic;
+            color: var(--caption-dark);
+        }
+        .figure-caption .MathJax {
+            color: var(--caption-dark) !important;
+            font-style: italic !important;
+        }
+        .figure-label {
+            font-weight: bold;
+        }
+        .citation {
+            color: var(--accent-dark);
+            cursor: pointer;
+            position: relative;
+            text-decoration: none;
+        }
+        .tooltip {
+            display: none;
+            position: fixed;
+            background-color: var(--code-bg-dark);
+            border: 1px solid var(--accent-dark);
+            border-radius: 5px;
+            padding: 10px;
+            z-index: 1000;
+            max-width: 600px;
+            width: max-content;
+            font-size: 16px;
+            line-height: 1.4;
+            white-space: normal;
+            color: var(--text-dark);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .citation.copied {
+            color: #4caf50;
+        }
+        .references {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--accent-dark);
+        }
+        .reference-item {
+            margin-bottom: 15px;
+            padding-left: 20px;
+            text-indent: -20px;
+        }
+        .todo {
+            color: #ff9800;
+            font-style: italic;
+        }
+        .qed {
+            display: inline-block;
+            font-size: 1.2em;
+            margin-left: auto;
+            vertical-align: middle;
+        }
+        .proof-panel {
+            background-color: var(--code-bg-dark);
+            border-left: 4px solid var(--accent-dark);
+            padding: 10px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .proof-panel.collapsed {
+            max-height: 30px;
+            overflow: hidden;
+        }
+        .proof-panel.expanded {
+            max-height: none;
+        }
+        .proof-toggle {
+            color: var(--strong-dark);
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: left;
+        }
+        .proof-toggle::after {
+            content: '▼';
+            transition: transform 0.3s ease;
+            margin-left: auto;
+        }
+        .proof-panel.collapsed .proof-toggle::after {
+            transform: rotate(-90deg);
+        }
+        .proof-content {
+            margin-top: 10px;
+            text-align: left;
+        }
+        .proof-content p:first-child {
+            margin-top: 0;
+            text-indent: 0;
+        }
+        .proof-content p:last-child {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .proof-content p {
+            margin: 1em 0;
+        }
+        .proof-content .MathJax {
+            margin: 0 0.2em;
+        }
+        .MathJax table {
+            margin: 0 auto;
+            border-collapse: collapse;
+            width: auto;
+        }
+        .MathJax table td {
+            padding: 8px 12px;
+            border: 1px solid var(--accent-dark);
+            text-align: center;
+        }
+        .MathJax table tr:first-child td {
+            background-color: var(--table-header-dark);
+            text-align: left;
+        }
+        body.light-theme .MathJax table tr:first-child td {
+            background-color: var(--table-header-light);
+            color: var(--text-light);
+        }
+        .MathJax .table-caption {
+            margin-top: 10px;
+            font-style: italic;
+            color: var(--caption-dark);
+            text-align: center;
+        }
+        .table {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .table-caption {
+            margin-top: 10px;
+            font-style: italic;
+            color: var(--caption-dark);
+        }
+        .subsection {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 1em;
+            color: var(--accent-dark);
+        }
+        .centered-table {
+            margin: 0 auto;
+            border-collapse: collapse;
+            width: auto;
+        }
+        .centered-table td {
+            padding: 8px 12px;
+            border: 1px solid var(--accent-dark);
+            text-align: center;
+        }
+        .centered-table tr:first-child td {
+            font-weight: bold;
+            background-color: var(--table-header-dark);
+            text-align: center;
+        }
+        body.light-theme .centered-table tr:first-child td {
+            background-color: var(--table-header-light);
+            color: var(--text-light);
+        }
+        .centered-table tr:first-child td:first-child {
+            text-align: center;
+        }
+        .floating-menu {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            display: flex;
+            gap: 10px;
+        }
+        .menu-button {
+            width: 40px;
+            height: 40px;
+            background-color: var(--accent-dark-transparent);
+            border: 1px solid var(--accent-dark-border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .menu-button:hover {
+            background-color: var(--accent-dark-hover);
+            border-color: var(--accent-dark);
+        }
+        .menu-button::before {
+            content: '≡';
+            color: var(--accent-dark);
+            font-size: 24px;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+        .menu-button:hover::before {
+            color: var(--accent-dark);
+        }
+        .theme-button {
+            width: 40px;
+            height: 40px;
+            background-color: var(--accent-dark-transparent);
+            border: 1px solid var(--accent-dark-border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .theme-button:hover {
+            background-color: var(--accent-dark-hover);
+            border-color: var(--accent-dark);
+        }
+        .theme-button::before {
+            content: '☉';
+            font-size: 20px;
+            transition: all 0.3s ease;
+            color: var(--accent-dark);
+        }
+        .theme-button.dark::before {
+            content: '☾';
+        }
+        body.light-theme .theme-button {
+            background-color: var(--accent-light-transparent);
+            border-color: var(--accent-light-border);
+        }
+        body.light-theme .theme-button:hover {
+            background-color: var(--accent-light-hover);
+            border-color: var(--accent-light);
+        }
+        body.light-theme .theme-button::before {
+            color: var(--accent-light);
+        }
+        .toc-container {
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background-color: rgba(45, 45, 45, 0.95);
+            border: 1px solid var(--accent-dark);
+            border-radius: 5px;
+            padding: 15px;
+            min-width: 250px;
+            max-width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            margin-bottom: 0px;
+        }
+        .toc-container.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .toc-title {
+            color: var(--accent-dark);
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            text-align: center;
+            border-bottom: 1px solid var(--accent-dark);
+            padding-bottom: 5px;
+        }
+        .toc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .toc-item {
+            margin: 5px 0;
+        }
+        .toc-link {
+            color: var(--text-dark);
+            text-decoration: none;
+            display: block;
+            padding: 0px 0px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+        .toc-link:hover {
+            background-color: var(--accent-dark-transparent);
+            color: var(--accent-dark);
+        }
+        .toc-section {
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+        .toc-subsection {
+            padding-left: 20px;
+            font-size: 0.7em;
+        }
+        .toc-rule {
+            border-top: 1px solid var(--accent-dark);
+            margin: 10px 0;
+        }
+        .toc-links {
+            font-size: 0.8em;
+            margin-top: 10px;
+            white-space: nowrap;
+        }
+        .toc-links a {
+            display: inline;
+            margin: 0 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-menu">
+        <div class="theme-button" id="themeButton"></div>
+        <div class="menu-button" id="menuButton"></div>
+        <div class="toc-container" id="tocContainer">
+            <div class="toc-title">Contents</div>
+            <ul class="toc-list" id="tocList"></ul>
+            <div class="toc-rule"></div>
+            <div class="toc-links" id="tocLinks"></div>
+        </div>
+    </div>
+    <div id="make-title"></div>
+    <div class="container" id="content"></div>
+    <div class="references" id="references"></div>
+    
+    <script>
+        // Theme
+        const themeButton = document.getElementById('themeButton');
+        const savedTheme = localStorage.getItem('latex.theme') || 'dark';
+        document.body.classList.toggle('light-theme', savedTheme === 'light');
+        themeButton.classList.toggle('dark', savedTheme === 'dark');
+
+        themeButton.addEventListener('click', () => {
+            const isLight = document.body.classList.toggle('light-theme');
+            themeButton.classList.toggle('dark', !isLight);
+            localStorage.setItem('latex.theme', isLight ? 'light' : 'dark');
+        });
+
+        // Hyperref
+        let lemmaCounter = 0;
+        let lemmaLabels = new Map();
+        let theoremCounter = 0;
+        const thmLabels = new Map();
+        let definitionCounter = 0;
+        const definitionLabels = new Map();
+        let figureCounter = 0;
+        const figureLabels = new Map();
+        let bibliography = null;
+        const citations = new Map();
+        const citationOrder = new Map();
+        let citationCounter = 0;
+        let sectionCounter = 0;
+        const sectionLabels = new Map();
+        let subsectionCounter = 0;
+        const subsectionLabels = new Map();
+        let tableCounter = 0;
+        const tableLabels = new Map();
+        const autorefMap = new Map();
+        let sectionId = null;
+        let subsecId = null;
+
+        // Convert number to Roman numeral (1-10)
+        const romanNumerals = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+        function numberToRoman(num) {
+            return romanNumerals[num] || num.toString();
+        }
+        
+        // Load and parse bibliography
+        async function loadBibliography() {
+            try {
+                const response = await fetch('ref.bib');
+                if (!response.ok) return;
+                const bibtex = await response.text();
+                bibliography = bibtexParse.toJSON(bibtex);
+                
+                // Process bibliography entries
+                bibliography.forEach(entry => {
+                    const authors = entry.entryTags.author ? entry.entryTags.author.split(' and ').map(a => a.trim()) : [];
+                    const firstAuthor = authors[0] ? authors[0].split(',').map(n => n.trim())[0] : '';
+                    const year = entry.entryTags.year || '';
+                    const title = entry.entryTags.title || '';
+                    const journal = entry.entryTags.journal || entry.entryTags.booktitle || '';
+                    
+                    citations.set(entry.citationKey, {
+                        authors: authors,
+                        title: title,
+                        journal: journal,
+                        year: year,
+                        firstAuthor: firstAuthor,
+                        number: 0
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading bibliography:', error);
+            }
+        }
+
+        let showFigures = true, readNewComd = false;
+        let newCommands = [];
+        let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
+        const getSecName = num => isAppx ? 'Appendix ' + String.fromCharCode(64 + num) : numberToRoman(num);
+        const preamble = [
+            // Comments
+            { regex: /%%(github|arxiv|edit|newcmd):([^\s]*)/g, replace: (match, type, text) => {
+                if (type == 'github') {
+                    githubRepo = text.trim();
+                } else if (type == 'arxiv') {
+                    arxivNum = text.trim();
+                } else if (type == 'edit') {
+                    showFigures = text.trim() !== 'on';
+                } else if (type == 'newcmd') {
+                    readNewComd = text.trim() !== 'off';
+                }
+                return '';
+            }},
+            { regex: /%[^\n]*/g, replace: () => '' },
+            { regex: /\\(?:re)?newcommand\{([^}]+)\}(?:\[([0-9]+)\])?\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/g, replace: (match, name, numArgs, definition) => {
+                if (readNewComd) {
+                    // TODO: Add new macro to MathJax configuration
+                    const macroName = name.replace(/^\\/, ''); // Remove leading backslash
+                    newCommands.push({ name: macroName, definition: definition, numArgs: numArgs ? parseInt(numArgs) : 0 });
+                    // console.log(`Name: ${macroName}, Definition: ${definition}, NumArgs: ${numArgs || 0}`);
+                }
+                return '';
+            }},
+            { regex: /\\begin\{document\}/g, replace: () => { documentBegun = true; return ''; }},
+        ];
+        const replacements = [
+            // Comments
+            { regex: /%%blank/g, replace: () => '<div style="height: 400px;"></div>' },
+            { regex: /%[^\n]*/g, replace: () => '' },
+
+            // Document structure
+            { regex: /\\title\{([^}]+)\}/g, replace: (match, title) => { titleHtml = `<h1>${title}</h1>`; return ''; } },
+            { regex: /\\author\{(?:(?:\{[^{}]*\})|[^{}])*\}/g, replace: (match) => {
+                const content = match.slice(8, -1);
+                authorHtml = `<div class="author">${content}</div>`;
+                return '';
+            }},
+            { regex: /\\affiliation\{([^}]+)\}/g, replace: (match, affiliation) => { affiliationHtml = `<div class="affiliation">${affiliation.replace(/\\\\/g, '')}</div>`; return ''; } },
+            { regex: /\\maketitle/g, replace: () => {
+                document.getElementById('make-title').innerHTML = titleHtml + authorHtml + affiliationHtml;
+                const linksHtml = `View on<a href="https://github.com/${githubRepo}" target="_blank">Github</a>or<a href="https://arxiv.org/pdf/${arxivNum}" target="_blank">arXiv</a>`;
+                document.getElementById('tocLinks').innerHTML = linksHtml;
+                return '';
+            }},
+            { regex: /\\begin\{document\}/g, replace: () => { documentBegun = true; return ''; }},
+            { regex: /\\documentclass(?:\[[^\]]*\])?\{[^}]+\}|\\end\{document\}|\\onecolumngrid|\\twocolumngrid|\\bibliography[^\n]*/g, replace: () => '' },
+            { regex: /\\usepackage(?:\[[^\]]*\])?\{[^}]+\}/g, replace: () => '' },
+            { regex: /\\appendix/g, replace: () => { isAppx = true; sectionCounter=0; return ''; }},
+            
+            // New commands
+            { regex: /\\(?:re)?newcommand\*?(?:\[([0-9]+)\])?\{([^}]+)\}\{([^}]+)\}/g, replace: (match, numArgs, name, definition) => {
+                if (readNewComd) {
+                    // Add new macro to MathJax configuration
+                    const macroName = name.replace(/^\\/, ''); // Remove leading backslash
+                    window.MathJax.config.tex.macros[macroName] = [definition, numArgs ? parseInt(numArgs) : 0];
+                    console.log(`Name: ${macroName}, Definition: ${definition}, NumArgs: ${numArgs || 0}`);
+                }
+                return '';
+            }},
+            
+            // Abstract
+            { regex: /\\begin\{abstract\}\s*((?:[^\\]|\\[^e])*?)\\end\{abstract\}/gs, replace: (match, content) => {
+                return `<div class="abstract">${content}</div>`;
+            }},
+            
+            // Sections
+            { regex: /\\section\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g, replace: (match, title, label) => {
+                sectionCounter++;
+                subsectionCounter = 0;
+                const sectionId = label ? `sec-${label}` : `sec-${sectionCounter}`;
+                subsecId = null;
+                const sectionHtml = `<h2 id="${sectionId}">${getSecName(sectionCounter)}. ${title}</h2>`;
+                if (label) {
+                    sectionLabels.set(label, getSecName(sectionCounter));
+                }
+                return sectionHtml;
+            }},
+            { regex: /\\subsection\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g, replace: (match, title, label) => {
+                subsectionCounter++;
+                const subsectionLetter = String.fromCharCode(64 + subsectionCounter);
+                const subsectionId = label ? `sec-${label}` : `sec-${sectionCounter}-${subsectionCounter}`;
+                const subsectionHtml = `<h3 class="subsection" id="${subsectionId}">${subsectionLetter}. ${title}</h3>`;
+                if (label) {
+                    subsectionLabels.set(label, getSecName(sectionCounter));
+                }
+                return subsectionHtml;
+            }},
+            
+            // Theorems, Lemmas, and Definitions
+            { regex: /\\begin\{(theorem|lemma|definition)\}(.*?)\\end\{\1\}/gs, replace: (match, type, content) => {
+                let counter;
+                let labels;
+                let prefix;
+                
+                switch(type) {
+                    case 'theorem':
+                        theoremCounter++;
+                        counter = theoremCounter;
+                        labels = thmLabels;
+                        prefix = 'thm';
+                        break;
+                    case 'lemma':
+                        lemmaCounter++;
+                        counter = lemmaCounter;
+                        labels = lemmaLabels;
+                        prefix = 'lem';
+                        break;
+                    case 'definition':
+                        definitionCounter++;
+                        counter = definitionCounter;
+                        labels = definitionLabels;
+                        prefix = 'def';
+                        break;
+                }
+                
+                // Parse optional title
+                const titleMatch = content.match(/\[(.*?)\]/);
+                const optionalText = titleMatch ? titleMatch[1] : '';
+                
+                // Parse label
+                const labelMatch = content.match(/\\label\{([^}]+):([^}]+)\}/);
+                const label = labelMatch ? labelMatch[2] : '';
+                const elementId = label ? `${prefix}-${label}` : `${prefix}-${counter}`;
+                labels.set(label, counter);
+                
+                // Remove the title and label from content
+                content = content.replace(/\[(.*?)\]/, '');
+                content = content.replace(/\\label\{[^}]+:[^}]+\}/, '');
+                
+                const optionalPart = optionalText ? ` (${optionalText})` : '';
+                const displayName = type.charAt(0).toUpperCase() + type.slice(1);
+                
+                return `<div class="theorem" id="${elementId}">
+                    <strong>${displayName} ${counter}${optionalPart}</strong>
+                    ${content}
+                </div>`;
+            }},
+            
+            // Figures
+            { regex: /\\begin\{figure\*?\}(.*?)\\end\{figure\*?\}/gs, replace: (match, content) => {
+                figureCounter++;
+                
+                // Check if it's a figure* environment
+                const isStarred = match.includes('figure*');
+                
+                // Parse label
+                const labelMatch = content.match(/\\label\{fig:([^}]+)\}/);
+                const label = labelMatch ? labelMatch[1] : '';
+                const figureId = label ? `fig-${label}` : `fig-${figureCounter}`;
+                figureLabels.set(label, figureCounter);
+                
+                // Parse caption
+                const captionMatch = content.match(/\\caption\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/);
+                let caption = '';
+                if (captionMatch){
+                    caption = captionMatch[1].trim();
+                }
+                
+                // Parse graphics with width parameter
+                const graphicsMatch = content.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/s);
+                const graphicsPath = graphicsMatch ? graphicsMatch[2].trim() : '';
+                const widthFactor = graphicsMatch && graphicsMatch[1] ? parseFloat(graphicsMatch[1]) : 1;
+                
+                // Remove parsed elements from content
+                content = content.replace(/\\label\{fig:[^}]+\}/, '');
+                content = content.replace(/\\caption\{[^}]+\}/, '');
+                content = content.replace(/\\includegraphics(?:\[[^\]]*\])?\s*\{[^}]+\}/s, '');
+                content = content.replace(/\\centering/, '');
+                
+                let figureContent = '';
+                if (graphicsPath) {
+                    if (showFigures) {
+                        // Show actual figure
+                        const fileExtension = graphicsPath.split('.').pop().toLowerCase();
+                        if (fileExtension === 'pdf') {
+                            figureContent = `<div style="text-align: center;">
+                                <iframe src="fig/${graphicsPath}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
+                                    style="width: ${widthFactor * 100}%; height: 600px; border: none;"
+                                    title="Figure ${figureCounter}">
+                                    <p>Your browser does not support PDFs. 
+                                    <a href="fig/${graphicsPath}" target="_blank">Click here to download the PDF</a>.</p>
+                                </iframe>
+                            </div>`;
+                        } else {
+                            figureContent = `<div style="text-align: center;">
+                                <img src="fig/${graphicsPath}" alt="Figure ${figureCounter}" style="width: ${widthFactor * 100}%;">
+                            </div>`;
+                        }
+                    } else {
+                        // Show placeholder
+                        figureContent = `<div style="width: 400px; height: 300px; border: 2px dashed #4a9eff; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #4a9eff;">
+                            <span>fig/${graphicsPath}</span>
+                        </div>`;
+                    }
+                }
+                
+                return `<div class="figure" id="${figureId}">
+                    ${figureContent}
+                    ${caption ? `<div class="figure-caption">Figure ${figureCounter}: ${caption}</div>` : ''}
+                </div>`;
+            }},
+            
+            // Tables
+            { regex: /\\begin\{table\*?\}(?:\[(.*?)\])?\s*(.*?)\\end\{table\*?\}/gs, replace: (match, placement, content) => {
+                tableCounter++;
+                
+                // Parse label
+                const labelMatch = content.match(/\\label\{tab:([^}]+)\}/);
+                const label = labelMatch ? labelMatch[1] : '';
+                const tableId = label ? `tab-${label}` : `tab-${tableCounter}`;
+                
+                // Parse caption
+                const captionMatch = content.match(/\\caption\{([^}]+)\}/);
+                const caption = captionMatch ? captionMatch[1] : '';
+                
+                // Parse tabular content
+                const tabularMatch = content.match(/\\begin\{tabular\}\{([^}]+)\}(.*?)\\end\{tabular\}/s);
+                if (!tabularMatch) return '';
+                
+                const columns = tabularMatch[1];
+                const tableContent = tabularMatch[2];
+                
+                // Parse table rows
+                const rows = tableContent
+                    .split(/(?:\\\\)?\s*\\hline/)
+                    .filter(row => row.trim())
+                    .map(row => {
+                        const cells = row.split('&').map(cell => cell.trim());
+                        return `<tr><td>${cells.join('</td><td>')}</td></tr>`;
+                    })
+                    .join('\n');
+                
+                return `<div class="table" id="${tableId}">
+                    <table class="centered-table">
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                    ${caption ? `<div class="table-caption">Table ${tableCounter}: ${caption}</div>` : ''}
+                </div>`;
+            }},
+
+            // Proofs
+            { regex: /\\pf\{([^}]+)\}/g, replace: (match, refName) => {
+                const refType = refName.split(':')[0];
+                const refLabel = refName.split(':')[1];
+                let refNum;
+                if (refType === 'thm' || refType === 'lem') {
+                    refNum = (refType === 'thm' ? thmLabels : lemmaLabels).get(refLabel);
+                    const key = `latex.${refType}${refNum}`;
+                    const displayName = refType === 'thm' ? `Theorem ${refNum}` : `Lemma ${refNum}`;
+                    const isExpanded = localStorage.getItem(key) === 'true';
+                    return `<div class="proof-panel ${isExpanded ? 'expanded' : 'collapsed'}">
+                        <div class="proof-toggle" onclick="toggleProof(this.parentElement, '${key}')">
+                            <span>Proof of&nbsp;&nbsp;</span><a href="#${refType}-${refNum}" onclick="event.stopPropagation()">${displayName}</a>
+                        </div>
+                        <div class="proof-content">`;
+                }
+                return '';
+            }},
+            { regex: /\\qed/g, replace: () => {
+                return `<span class="qed">&#x220E;</span></div></div>`;
+            }},
+            
+            // Cross-references
+            { regex: /\\autoref\{(eq|fig|sec|thm|lem):([^}]+)\}/g, replace: (match, type, label) => {
+                const id = `autoref-${autorefMap.size}`;
+                autorefMap.set(id, { type, label });
+                return `<span class="autoref-placeholder" data-id="${id}"></span>`;
+            }},
+            
+            // Citations
+            { regex: /\\cite\{([^}]+)\}/g, replace: (match, refKeys) => {
+                const keys = refKeys.split(',').map(k => k.trim());
+                return keys.map(key => {
+                    const citation = citations.get(key);
+                    if (citation) {
+                        if (!citationOrder.has(key)) {
+                            citationCounter++;
+                            citationOrder.set(key, citationCounter);
+                            citation.number = citationCounter;
+                        }
+                        
+                        const tooltip = `[${citation.number}] ${citation.authors.join(', ')}, "${citation.title}", ${citation.journal} (${citation.year})`;
+                        const escapedTooltip = tooltip.replace(/"/g, '&quot;');
+                        return `<a class="citation" data-tooltip="${escapedTooltip}" data-key="${key}" onmouseover="showTooltip(this, event)" onmouseout="hideTooltip()" href="https://scholar.google.com/scholar?q=${encodeURIComponent(citation.title)}" target="_blank">[${citation.number}]</a>`;
+                    } else {
+                        return `<span style="color: orange;">[${key}]</span>`;
+                    }
+                }).join('');
+            }},
+            
+            // Miscellaneous
+            { regex: /\\todo\{([^}]*)}/g, replace: (match, content) => {
+                return `<span class="todo">(TODO: ${content.trim()})</span>`;
+            }},
+            { regex: /\\"o/g, replace: () => '&ouml;' },
+            { regex: /\\emph\{([^}]+)\}/g, replace: (match, content) => `<em>${content}</em>` },
+            { regex: /\\#/g, replace: () => '#' },
+            { regex: /~+/g, replace: () => '&nbsp;' },
+        ];
+        
+        // Custom parser for LaTeX content
+        function parseLaTeX(text) {
+            // First split into paragraphs at blank lines
+            const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
+            let html = '';
+            
+            for (let para of paragraphs) {
+                if (!documentBegun) {
+                    preamble.forEach(({ regex, replace }) => {
+                        para = para.replace(regex, replace);
+                    });
+                }
+                if (documentBegun) {
+                    replacements.forEach(({ regex, replace }) => {
+                        para = para.replace(regex, replace);
+                    });
+                    para = para.split('\n').map(line=>line.trim()).join(' ');
+                    html += `<p>${para}</p>`;
+                }
+            }
+            
+            return html;
+        }
+
+        // Position tooltips
+        function showTooltip(element, event) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.textContent = element.getAttribute('data-tooltip');
+            document.body.appendChild(tooltip);
+
+            const rect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            let left = event.clientX - rect.width / 2;
+            let top = event.clientY - rect.height - 20;
+            
+            // Adjust if tooltip would go off the right edge
+            if (left + rect.width > viewportWidth) {
+                left = viewportWidth - rect.width - 10;
+            }
+            
+            // Adjust if tooltip would go off the left edge
+            if (left < 0) {
+                left = 10;
+            }
+            
+            // Adjust if tooltip would go off the top
+            if (top < 0) {
+                top = event.clientY + 20;
+            }
+            
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+            tooltip.style.display = 'block';
+        }
+
+        function hideTooltip() {
+            const tooltip = document.querySelector('.tooltip');
+            if (tooltip) {
+                tooltip.remove();
+            }
+        }
+
+        // Update tooltip position on mouse move
+        document.addEventListener('mousemove', (e) => {
+            const tooltip = document.querySelector('.tooltip');
+            if (tooltip) {
+                const rect = tooltip.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                let left = e.clientX - rect.width / 2;
+                let top = e.clientY - rect.height - 20;
+                
+                // Adjust if tooltip would go off the right edge
+                if (left + rect.width > viewportWidth) {
+                    left = viewportWidth - rect.width - 10;
+                }
+                
+                // Adjust if tooltip would go off the left edge
+                if (left < 0) {
+                    left = 10;
+                }
+                
+                // Adjust if tooltip would go off the top
+                if (top < 0) {
+                    top = e.clientY + 20;
+                }
+                
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+            }
+        });
+
+        // Fetch and render content
+        async function renderContent() {
+            await loadBibliography();
+            
+            fetch('main.tex')
+                .then(response => response.text())
+                .then(text => {
+                    const html = parseLaTeX(text);
+                    document.getElementById('content').innerHTML = html;
+                    
+                    // Process autoref references
+                    document.querySelectorAll('.autoref-placeholder').forEach(placeholder => {
+                        const { type, label } = autorefMap.get(placeholder.getAttribute('data-id'));
+                        let replacement = '';
+                        
+                        if (type === 'eq') {
+                            replacement = `Eq.&nbsp;\\eqref{eq:${label}}`;
+                        } else if (type === 'fig') {
+                            const figNum = figureLabels.get(label);
+                            replacement = figNum ? `<a href="#fig-${label}">Figure&nbsp;${figNum}</a>` : `Figure&nbsp;??`;
+                        } else if (type === 'sec') {
+                            const secLabel = sectionLabels.get(label) || subsectionLabels.get(label) || '??';
+                            replacement = secLabel ? `<a href="#sec-${label}">Sec.&nbsp;${secLabel}</a>` : `Section&nbsp;??`;
+                        } else if (type === 'thm') {
+                            const thmNum = thmLabels.get(label);
+                            replacement = thmNum ? `<a href="#thm-${label}">Theorem&nbsp;${thmNum}</a>` : `Theorem&nbsp;??`;
+                        } else if (type === 'lem') {
+                            const lemNum = lemmaLabels.get(label);
+                            replacement = lemNum ? `<a href="#lem-${label}">Lemma&nbsp;${lemNum}</a>` : `Lemma&nbsp;??`;
+                        }
+                        
+                        placeholder.outerHTML = replacement;
+                    });
+                    
+                    const sortedCitations = Array.from(citations.entries())
+                        .filter(([key, citation]) => citation.number > 0)
+                        .sort((a, b) => a[1].number - b[1].number);
+                    const referencesHtml = sortedCitations
+                        .map(([key, citation]) => {
+                            const authors = citation.authors.map(author => {
+                                const parts = author.split(',');
+                                return parts.length > 1 ? `${parts[1].trim()} ${parts[0].trim()}` : author.trim() == 'others' ? 'et al.' : author.trim();
+                            }).join(', ');
+                            return `<div class="reference-item" id="ref-${key}">
+                                [${citation.number}] ${authors}, "${citation.title}", ${citation.journal} (${citation.year})
+                            </div>`;
+                        })
+                        .join('\n');
+                    
+                    const referencesDiv = document.getElementById('references');
+                    if (sortedCitations.length > 0) {
+                        referencesDiv.style.borderTop = '1px solid var(--accent-dark)';
+                        referencesDiv.style.marginTop = '40px';
+                        referencesDiv.style.paddingTop = '20px';
+                        referencesDiv.innerHTML = `
+                            <h2 id="references-title">References</h2>
+                            ${referencesHtml}
+                        `;
+                    } else {
+                        referencesDiv.style.borderTop = 'none';
+                        referencesDiv.style.marginTop = '0';
+                        referencesDiv.style.paddingTop = '0';
+                        referencesDiv.innerHTML = '';
+                    }
+
+                    generateTableOfContents();
+                    
+                    // Wait for MathJax to complete and then restore scroll position
+                    MathJax.typesetPromise().then(() => {
+                        console.log('MathJax typeset complete');
+                        // Add a small delay to ensure all content is fully rendered
+                        setTimeout(() => {
+                            const savedPosition = localStorage.getItem('latex.scroll');
+                            if (savedPosition !== null) {
+                                window.scrollTo(0, parseInt(savedPosition, 10));
+                            }
+                        }, 10);
+                    });
+                })
+                .catch(error => console.error('Error loading LaTeX file:', error));
+        }
+
+        renderContent();
+
+        window.addEventListener('beforeunload', () => {
+            localStorage.setItem('latex.scroll', window.scrollY);
+        });
+
+        function toggleProof(panel, pfKey) {
+            panel.classList.toggle('collapsed');
+            panel.classList.toggle('expanded');
+            localStorage.setItem(pfKey, panel.classList.contains('expanded'));
+        }
+
+        // Table of Contents functionality
+        function generateTableOfContents() {
+            const tocList = document.getElementById('tocList');
+            tocList.innerHTML = '';
+
+            // Get all sections and subsections
+            const sections = document.querySelectorAll('h2');
+            sections.forEach((section, index) => {
+                const sectionText = section.textContent;
+                const sectionId = section.id;
+                
+                const sectionItem = document.createElement('li');
+                sectionItem.className = 'toc-item toc-section';
+                sectionItem.innerHTML = `<a class="toc-link" href="#${sectionId}" onclick="event.preventDefault(); document.getElementById('${sectionId}').scrollIntoView({ behavior: 'smooth', block: 'start' });">${sectionText}</a>`;
+                tocList.appendChild(sectionItem);
+
+                // Find subsections for this section
+                let nextElement = section.nextElementSibling;
+                while (nextElement && nextElement.tagName !== 'H2') {
+                    if (nextElement.classList.contains('subsection')) {
+                        const subsectionText = nextElement.textContent;
+                        const subsectionId = nextElement.id;
+                        
+                        const subsectionItem = document.createElement('li');
+                        subsectionItem.className = 'toc-item toc-subsection';
+                        subsectionItem.innerHTML = `<a class="toc-link" href="#${subsectionId}" onclick="event.preventDefault(); document.getElementById('${subsectionId}').scrollIntoView({ behavior: 'smooth', block: 'start' });">${subsectionText}</a>`;
+                        tocList.appendChild(subsectionItem);
+                    }
+                    nextElement = nextElement.nextElementSibling;
+                }
+            });
+        }
+
+        // Menu button interaction
+        const menuButton = document.getElementById('menuButton');
+        const tocContainer = document.getElementById('tocContainer');
+        let tocTimeout;
+
+        menuButton.addEventListener('mouseenter', () => {
+            clearTimeout(tocTimeout);
+            tocContainer.classList.add('visible');
+        });
+
+        menuButton.addEventListener('mouseleave', () => {
+            tocTimeout = setTimeout(() => {
+                if (!tocContainer.matches(':hover')) {
+                    tocContainer.classList.remove('visible');
+                }
+            }, 100);
+        });
+
+        tocContainer.addEventListener('mouseenter', () => {
+            clearTimeout(tocTimeout);
+            tocContainer.classList.add('visible');
+        });
+
+        tocContainer.addEventListener('mouseleave', () => {
+            tocTimeout = setTimeout(() => {
+                if (!menuButton.matches(':hover')) {
+                    tocContainer.classList.remove('visible');
+                }
+            }, 100);
+        });
+
+        menuButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            tocContainer.classList.toggle('visible');
+        });
+    </script>
+</body>
+</html>
