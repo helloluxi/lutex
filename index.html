@@ -6,135 +6,37 @@
     <title>Real-time LaTeX Renderer</title>
     <link rel="icon" href="data:,">
     <script src="bibtexParse.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     <script>
-        window.MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['\\[', '\\]']],
-                macros: {
-                    abs: ["\\left| #1 \\right|", 1],
-                    ket: ["\\left| #1 \\right\\rangle", 1],
-                    bra: ["\\left\\langle #1 \\right|", 1],
-                    ip: ["\\left\\langle #1 \\middle| #2 \\right\\rangle", 2],
-                    dyad: ["\\left| #1 \\right\\rangle \\! \\left\\langle #2 \\right|", 2],
-                    mel: ["\\left\\langle #1 \\middle| #2 \\middle| #3 \\right\\rangle", 3],
-                    Q: "\\hat{Q}",
-                    P: "\\hat{P}",
-                    q: "\\hat{q}",
-                    p: "\\hat{p}",
-                    a: "\\hat{a}",
-                    ad: "\\hat{a}^\\dagger",
-                    b: "\\hat{b}",
-                    bd: "\\hat{b}^\\dagger",
-                    c: "\\hat{c}",
-                    cd: "\\hat{c}^\\dagger",
-                    y: "\\hat{y}",
-                    yp: "\\hat{y}^{\\perp}",
-                    n: "\\hat{n}",
-                    sx: "\\sigma_x",
-                    sy: "\\sigma_y",
-                    sz: "\\sigma_z",
-                    tg: "\\tilde{g}",
-                    C: "\\mathbb{C}",
-                    R: "\\mathbb{R}",
-                    Z: "\\mathbb{Z}",
-                    E: ["\\mathcal{E}\\left( #1 \\right)", 1],
-                    D: ["\\mathcal{D}\\left( #1 \\right)", 1],
-                    cdsub: ["\\mathcal{CD}_{#1}\\left( #2 \\right)", 2],
-                    CD: ["\\mathcal{CD}\\left( #1 \\right)", 1],
-                    tD: ["\\tilde{\\mathcal{D}}\\left( #1 \\right)", 1],
-                    tCD: ["\\widetilde{\\mathcal{CD}}\\left( #1 \\right)", 1],
-                    S: ["\\mathcal{S}\\left( #1 \\right)", 1],
-                    G: "\\mathcal{G}",
-                    K: "\\mathcal{K}",
-                    N: "\\mathcal{N}",
-                    RR: ["\\mathcal{R}\\left( #1 \\right)", 1],
-                    BS: ["\\mathcal{BS}\\left( #1 \\right)", 1],
-                    JC: ["\\mathcal{JC}\\left( #1 \\right)", 1],
-                    CP: "\\mathcal{CP}",
-                    F: "\\mathcal{F}",
-                    tr: "\\text{Tr}",
-                    dd: "\\mathrm{d}",
-                    w: "\\hat{w}",
-                    v: "\\hat{v}",
-                    x: "\\hat{x}",
-                    y: "\\hat{y}",
-                    h: "\\hat{H}",
-                    O: "\\hat{O}",
-                    H: "\\hat{H}",
-                    W: "\\mathcal{W}",
-                    inv: "^{-1}",
-                    z: "\\mathbf{z}",
-                    r: "\\mathbf{r}",
-                    m: "\\mathbf{m}",
-                    nm: ["\\left\\| #1 \\right\\|_{\\infty}", 1],
-                    bmzeta: "\\mathbf{\\zeta}",
-                    eps: "\\varepsilon",
-                    hft: "\\frac{\\theta}{2}",
-                    tpsi: "\\tilde{\\psi}",
-                    tq: "\\tilde{q}",
-                    tp: "\\tilde{p}",
-                    bj: "\\overline{j}",
-                    bk: "\\overline{k}",
-                    bq: "\\overline{q}",
-                    bp: "\\overline{p}",
-                    hf: ["\\frac{#1}{2}", 1],
-                    hfth: "\\frac{\\theta}{2}",
-                    qtth: "\\frac{\\theta}{4}",
-                    bma: "\\mathbf{\\alpha}",
-                    bmz: "\\mathbf{z}",
-                    bmmu: "\\mathbf{\\mu}",
-                    bmsg: "\\mathbf{\\Sigma}",
-                    ketq: ["\\left| #1 \\right\\rangle_Q", 1],
-                    ketp: ["\\left| #1 \\right\\rangle_P", 1],
-                    keta: ["\\left| #1 \\right\\rangle_C", 1],
-                    ketf: ["\\left| #1 \\right\\rangle_F", 1],
-                    braq: ["{}_Q\\!\\left\\langle #1 \\right|", 1],
-                    brap: ["{}_P\\!\\left\\langle #1 \\right|", 1],
-                    braa: ["{}_C\\!\\left\\langle #1 \\right|", 1],
-                    braf: ["{}_F\\!\\left\\langle #1 \\right|", 1],
-                    dyadcc: ["\\left| #1 \\right\\rangle_{c\\,c}\\left\\langle #1 \\right|", 1],
-                    L: "\\mathcal{L}",
-                    O: ["\\mathcal{O}\\left( #1 \\right)", 1],
-                    cip: ["{}_C\\!\\left\\langle #1 \\middle| #2 \\right\\rangle", 2],
-                    cipc: ["{}_C\\!\\left\\langle #1 \\middle| #2 \\right\\rangle_C", 2],
-                    cmel: ["{}_C\\!\\left\\langle #1 \\middle| #2 \\middle| #3 \\right\\rangle", 3],
-                    ipc: ["\\left\\langle #1 \\middle| #2 \\right\\rangle_C", 2],
-                    set: [ "\\left\\{ #1 \\right\\}", 1],
-                    norm: ["\\left\\| #1 \\right\\|", 1],
-                    pp: ["\\left( #1 \\right)", 1],
-                    bb: ["\\left[ #1 \\right]", 1],
-                    ppp: ["\\frac{\\partial^2}{\\partial {#1} ^2}", 1],
-                    nn: "\\nonumber",
-                    sqtw: "\\sqrt{2}",
-                    sqhf: ["\\frac{#1}{\\sqrt{2}}", 1],
-                    dag: "\\dagger",
-                    Re: "\\mathrm{Re}",
-                    Im: "\\mathrm{Im}",
-                    tj: "\\tilde{j}",
-                    tk: "\\tilde{k}",
-                    ts: "\\tilde{s}",
-                    tt: "\\tilde{t}",
-                    tE: "\\tilde{E}",
-                    bm: ["\\mathbf{#1}", 1],
-                    QFT: "\\widetilde{QFT}",
-                    sinc: "\\mathrm{sinc}",
-                    Enc: "\\mathrm{Enc}",
-                    Dec: "\\mathrm{Dec}",
-                    splus: "\\sigma_+",
-                    sminus: "\\sigma_-",
-                },
-                tags: 'ams',
-                tagSide: 'right',
-                tagIndent: '0.8em',
-                useLabelIds: true,
+        // KaTeX configuration
+        let katexOptions = {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\begin{equation}', right: '\\end{equation}', display: true},
+                {left: '\\begin{equation*}', right: '\\end{equation*}', display: true},
+                {left: '\\begin{align}', right: '\\end{align}', display: true},
+                {left: '\\begin{align*}', right: '\\end{align*}', display: true},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            macros: {
+                '\\dd': '\\operatorname{d}',
+                '\\bm': '\\boldsymbol{#1}',
+                '\\ev': '\\left\\langle #1 \\right\\rangle',
+                '\\tr': '\\operatorname{tr}',
+                '\\norm': '\\left\\| #1 \\right\\|',
+                '\\ip': '\\left\\langle #1 \\middle| #2 \\right\\rangle',
+                '\\dyad': '\\ket{#1}_{C}\\bra{#2}_{C}',
             },
-            options: {
-                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
-            },
+            throwOnError: false,
+            trust: true
         };
     </script>
-    <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/contrib/copy-tex.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/contrib/copy-tex.min.js"></script>
     <style>
         :root {
             /* Dark theme colors */
@@ -246,6 +148,7 @@
             color: var(--text-dark);
         }
         a {
+            text-decoration: none;
             color: var(--accent-dark);
         }
         code {
@@ -645,6 +548,8 @@
         const definitionLabels = new Map();
         let figureCounter = 0;
         const figureLabels = new Map();
+        let equationCounter = 0;
+        const equationLabels = new Map();
         let bibliography = null;
         const citations = new Map();
         const citationOrder = new Map();
@@ -696,7 +601,6 @@
         }
 
         let showFigures = true, readNewComd = false;
-        let newCommands = [];
         let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
         const getSecName = num => isAppx ? 'Appendix ' + String.fromCharCode(64 + num) : numberToRoman(num);
         const preamble = [
@@ -716,10 +620,7 @@
             { regex: /%[^\n]*/g, replace: () => '' },
             { regex: /\\(?:re)?newcommand\{([^}]+)\}(?:\[([0-9]+)\])?\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/g, replace: (match, name, numArgs, definition) => {
                 if (readNewComd) {
-                    // TODO: Add new macro to MathJax configuration
-                    const macroName = name.replace(/^\\/, ''); // Remove leading backslash
-                    newCommands.push({ name: macroName, definition: definition, numArgs: numArgs ? parseInt(numArgs) : 0 });
-                    // console.log(`Name: ${macroName}, Definition: ${definition}, NumArgs: ${numArgs || 0}`);
+                    katexOptions.macros[name] = definition;
                 }
                 return '';
             }},
@@ -748,17 +649,6 @@
             { regex: /\\documentclass(?:\[[^\]]*\])?\{[^}]+\}|\\end\{document\}|\\onecolumngrid|\\twocolumngrid|\\bibliography[^\n]*/g, replace: () => '' },
             { regex: /\\usepackage(?:\[[^\]]*\])?\{[^}]+\}/g, replace: () => '' },
             { regex: /\\appendix/g, replace: () => { isAppx = true; sectionCounter=0; return ''; }},
-            
-            // New commands
-            { regex: /\\(?:re)?newcommand\*?(?:\[([0-9]+)\])?\{([^}]+)\}\{([^}]+)\}/g, replace: (match, numArgs, name, definition) => {
-                if (readNewComd) {
-                    // Add new macro to MathJax configuration
-                    const macroName = name.replace(/^\\/, ''); // Remove leading backslash
-                    window.MathJax.config.tex.macros[macroName] = [definition, numArgs ? parseInt(numArgs) : 0];
-                    console.log(`Name: ${macroName}, Definition: ${definition}, NumArgs: ${numArgs || 0}`);
-                }
-                return '';
-            }},
             
             // Abstract
             { regex: /\\begin\{abstract\}\s*((?:[^\\]|\\[^e])*?)\\end\{abstract\}/gs, replace: (match, content) => {
@@ -971,6 +861,16 @@
                 return `<span class="autoref-placeholder" data-id="${id}"></span>`;
             }},
             
+            // Equation labels
+            { regex: /\\begin\{equation\}/gs, replace: () => {
+                equationCounter++;
+                return '\\begin{equation}';
+            }},
+            { regex: /\\label\{eq:([^}]+)\}/g, replace: (match, label) => {
+                equationLabels.set(label, equationCounter);
+                return '';
+            }},
+            
             // Citations
             { regex: /\\cite\{([^}]+)\}/g, replace: (match, refKeys) => {
                 const keys = refKeys.split(',').map(k => k.trim());
@@ -1114,7 +1014,7 @@
                         let replacement = '';
                         
                         if (type === 'eq') {
-                            replacement = `Eq.&nbsp;\\eqref{eq:${label}}`;
+                            replacement = `<a href="#eq-${label}">Eq.&nbsp;(${equationLabels.get(label)})</a>`;
                         } else if (type === 'fig') {
                             const figNum = figureLabels.get(label);
                             replacement = figNum ? `<a href="#fig-${label}">Figure&nbsp;${figNum}</a>` : `Figure&nbsp;??`;
@@ -1165,17 +1065,28 @@
 
                     generateTableOfContents();
                     
-                    // Wait for MathJax to complete and then restore scroll position
-                    MathJax.typesetPromise().then(() => {
-                        console.log('MathJax typeset complete');
-                        // Add a small delay to ensure all content is fully rendered
-                        setTimeout(() => {
-                            const savedPosition = localStorage.getItem('latex.scroll');
-                            if (savedPosition !== null) {
-                                window.scrollTo(0, parseInt(savedPosition, 10));
-                            }
-                        }, 10);
-                    });
+                    // Render math after all content is loaded
+                    try {
+                        renderMathInElement(document.body, {
+                            ...katexOptions,
+                            output: 'html',
+                            strict: false,
+                            trust: true,
+                            throwOnError: false,
+                            displayMode: true
+                        });
+                        console.log('KaTeX rendering complete');
+                    } catch (error) {
+                        console.error('KaTeX rendering error:', error);
+                    }
+
+                    // Add a small delay to ensure all content is fully rendered
+                    setTimeout(() => {
+                        const savedPosition = localStorage.getItem('latex.scroll');
+                        if (savedPosition !== null) {
+                            window.scrollTo(0, parseInt(savedPosition, 10));
+                        }
+                    }, 100);
                 })
                 .catch(error => console.error('Error loading LaTeX file:', error));
         }
