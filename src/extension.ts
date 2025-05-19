@@ -68,9 +68,22 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // Start listening on port 4999
-    httpServer.listen(4999, 'localhost', () => {
-        console.log('HTTP Server listening on port 4999');
+    // Check if main.tex exists and start server if it does
+    vscode.workspace.findFiles('**/main.tex').then((files) => {
+        if (files.length > 0) {
+            // Try to start the server
+            httpServer.listen(4999, 'localhost', () => {
+                console.log('HTTP Server listening on port 4999');
+            }).on('error', (err: NodeJS.ErrnoException) => {
+                if (err.code === 'EADDRINUSE') {
+                    console.error('Port 4999 is already in use. Server not started.');
+                } else {
+                    console.error('Error starting server:', err);
+                }
+            });
+        } else {
+            console.log('No main.tex found in workspace. Server not started.');
+        }
     });
 
     // Clean up when the extension is deactivated
