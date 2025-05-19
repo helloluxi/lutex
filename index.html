@@ -19,7 +19,6 @@
                 {left: '\\begin{equation*}', right: '\\end{equation*}', display: true},
                 {left: '\\begin{align}', right: '\\end{align}', display: true},
                 {left: '\\begin{align*}', right: '\\end{align*}', display: true},
-                {left: '\\(', right: '\\)', display: false},
                 {left: '\\[', right: '\\]', display: true}
             ],
             macros: {
@@ -30,13 +29,15 @@
                 '\\norm': '\\left\\| #1 \\right\\|',
                 '\\ip': '\\left\\langle #1 \\middle| #2 \\right\\rangle',
                 '\\dyad': '\\ket{#1}_{C}\\bra{#2}_{C}',
+                '\\ket': '\\left| #1 \\right\\rangle',
+                '\\bra': '\\left\\langle #1 \\right|',
             },
             throwOnError: false,
             trust: true
         };
     </script>
-    <link href="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/contrib/copy-tex.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/contrib/copy-tex.min.js"></script>
+    <!-- <link href="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/contrib/copy-tex.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/contrib/copy-tex.min.js"></script> -->
     <style>
         :root {
             /* Dark theme colors */
@@ -529,14 +530,14 @@
     <script>
         // Theme
         const themeButton = document.getElementById('themeButton');
-        const savedTheme = localStorage.getItem('latex.theme') || 'dark';
+        const savedTheme = localStorage.getItem('theme') || 'dark';
         document.body.classList.toggle('light-theme', savedTheme === 'light');
         themeButton.classList.toggle('dark', savedTheme === 'dark');
 
         themeButton.addEventListener('click', () => {
             const isLight = document.body.classList.toggle('light-theme');
             themeButton.classList.toggle('dark', !isLight);
-            localStorage.setItem('latex.theme', isLight ? 'light' : 'dark');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
         });
 
         // Hyperref
@@ -550,6 +551,7 @@
         const figureLabels = new Map();
         let equationCounter = 0;
         const equationLabels = new Map();
+        const equationInvMap = new Map();
         let bibliography = null;
         const citations = new Map();
         const citationOrder = new Map();
@@ -600,7 +602,7 @@
             }
         }
 
-        let showFigures = true, readNewComd = false;
+        let editMode = true, readNewComd = false;
         let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
         const getSecName = num => isAppx ? 'Appendix ' + String.fromCharCode(64 + num) : numberToRoman(num);
         const preamble = [
@@ -611,7 +613,7 @@
                 } else if (type == 'arxiv') {
                     arxivNum = text.trim();
                 } else if (type == 'edit') {
-                    showFigures = text.trim() !== 'on';
+                    editMode = text.trim() !== 'off';
                 } else if (type == 'newcmd') {
                     readNewComd = text.trim() !== 'off';
                 }
@@ -761,7 +763,7 @@
                 
                 let figureContent = '';
                 if (graphicsPath) {
-                    if (showFigures) {
+                    if (!editMode) {
                         // Show actual figure
                         const fileExtension = graphicsPath.split('.').pop().toLowerCase();
                         if (fileExtension === 'pdf') {
@@ -862,13 +864,13 @@
             }},
             
             // Equation labels
-            { regex: /\\begin\{equation\}/gs, replace: () => {
+            { regex: /\\begin\{equation\}(\\label\{eq:([^}]+)\})?/gs, replace: (match, hasLabel, label) => {
                 equationCounter++;
+                if (hasLabel) {
+                    equationLabels.set(label, equationCounter);
+                    equationInvMap.set(equationCounter, label);
+                }
                 return '\\begin{equation}';
-            }},
-            { regex: /\\label\{eq:([^}]+)\}/g, replace: (match, label) => {
-                equationLabels.set(label, equationCounter);
-                return '';
             }},
             
             // Citations
@@ -904,26 +906,48 @@
         
         // Custom parser for LaTeX content
         function parseLaTeX(text) {
-            // First split into paragraphs at blank lines
-            const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
+            let startLineNum = 0, lineNum = 0;
+            let para = '';
             let html = '';
-            
-            for (let para of paragraphs) {
-                if (!documentBegun) {
-                    preamble.forEach(({ regex, replace }) => {
-                        para = para.replace(regex, replace);
-                    });
-                }
-                if (documentBegun) {
-                    replacements.forEach(({ regex, replace }) => {
-                        para = para.replace(regex, replace);
-                    });
-                    para = para.split('\n').map(line=>line.trim()).join(' ');
-                    html += `<p>${para}</p>`;
+            let env = '';
+            for (let line of text.split('\n')) {
+                lineNum++;
+                if (env === '' && line.startsWith('\\begin{')) {
+                    env = line.substring(7, line.indexOf('}')).trim();
+                    html += parsePara(para, startLineNum);
+                    para = line.trim() + '\n';
+                    startLineNum = lineNum;
+                } else if (env !== '' && line.startsWith(`\\end{${env}}`) || line.trim() === '') {
+                    para += line.trim();
+                    html += parsePara(para, startLineNum);
+                    para = '';
+                    env = '';
+                    startLineNum = lineNum + 1;
+                } else {
+                    para += line.trim() + '\n';
                 }
             }
-            
             return html;
+        }
+
+        function parsePara(para, startLineNum) {
+            if (!documentBegun) {
+                preamble.forEach(({ regex, replace }) => {
+                    para = para.replace(regex, replace);
+                });
+                if (!documentBegun) {
+                    return '';
+                }
+            }
+            replacements.forEach(({ regex, replace }) => {
+                para = para.replace(regex, replace);
+            });
+            para = para.split('\n').map(line=>line.trim()).join(' ');
+            if (editMode && documentBegun) {
+                return `<p line="${startLineNum}">${para}</p>`;
+            } else {
+                return `<p>${para}</p>`;
+            }
         }
 
         // Position tooltips
@@ -1006,6 +1030,7 @@
                 .then(response => response.text())
                 .then(text => {
                     const html = parseLaTeX(text);
+
                     document.getElementById('content').innerHTML = html;
                     
                     // Process autoref references
@@ -1086,6 +1111,13 @@
                         if (savedPosition !== null) {
                             window.scrollTo(0, parseInt(savedPosition, 10));
                         }
+                        // Label the equations
+                        document.querySelectorAll('.katex-display').forEach((display, index) => {
+                            const label = equationInvMap.get(index + 1);
+                            if (label) {
+                                display.setAttribute('id', `eq-${label}`);
+                            }
+                        });
                     }, 100);
                 })
                 .catch(error => console.error('Error loading LaTeX file:', error));
@@ -1170,6 +1202,26 @@
         menuButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
             tocContainer.classList.toggle('visible');
+        });
+
+        // Add click handler for line numbers
+        document.addEventListener('click', (e) => {
+            if (e.ctrlKey && editMode) {
+                let element = e.target;
+                while (element && !element.hasAttribute('line')) {
+                    element = element.parentElement;
+                }
+                if (element && element.hasAttribute('line')) {
+                    const line = element.getAttribute('line');
+                    fetch('http://localhost:4999', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'text/plain',
+                        },
+                        body: line
+                    }).catch(error => console.error('Error sending line number:', error));
+                }
+            }
         });
     </script>
 </body>
