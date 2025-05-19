@@ -19,6 +19,10 @@
                 {left: '\\begin{equation*}', right: '\\end{equation*}', display: true},
                 {left: '\\begin{align}', right: '\\end{align}', display: true},
                 {left: '\\begin{align*}', right: '\\end{align*}', display: true},
+                {left: '\\begin{gather}', right: '\\end{gather}', display: true},
+                {left: '\\begin{gather*}', right: '\\end{gather*}', display: true},
+                {left: '\\begin{eqnarray}', right: '\\end{eqnarray}', display: true},
+                {left: '\\begin{eqnarray*}', right: '\\end{eqnarray*}', display: true},
                 {left: '\\[', right: '\\]', display: true}
             ],
             macros: {
@@ -28,9 +32,11 @@
                 '\\tr': '\\operatorname{tr}',
                 '\\norm': '\\left\\| #1 \\right\\|',
                 '\\ip': '\\left\\langle #1 \\middle| #2 \\right\\rangle',
-                '\\dyad': '\\ket{#1}_{C}\\bra{#2}_{C}',
+                '\\mel': '\\left\\langle #1 \\middle| #2 \\middle| #3 \\right\\rangle',
+                '\\dyad': '\\ket{#1}\\bra{#2}',
                 '\\ket': '\\left| #1 \\right\\rangle',
                 '\\bra': '\\left\\langle #1 \\right|',
+                '\\abs': '\\left| #1 \\right|',
             },
             throwOnError: false,
             trust: true
@@ -602,37 +608,10 @@
             }
         }
 
-        let editMode = true, readNewComd = false;
+        let editMode = true, readNewComd = false, regionIgnore = false;
         let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
         const getSecName = num => isAppx ? 'Appendix ' + String.fromCharCode(64 + num) : numberToRoman(num);
-        const preamble = [
-            // Comments
-            { regex: /%%(github|arxiv|edit|newcmd):([^\s]*)/g, replace: (match, type, text) => {
-                if (type == 'github') {
-                    githubRepo = text.trim();
-                } else if (type == 'arxiv') {
-                    arxivNum = text.trim();
-                } else if (type == 'edit') {
-                    editMode = text.trim() !== 'off';
-                } else if (type == 'newcmd') {
-                    readNewComd = text.trim() !== 'off';
-                }
-                return '';
-            }},
-            { regex: /%[^\n]*/g, replace: () => '' },
-            { regex: /\\(?:re)?newcommand\{([^}]+)\}(?:\[([0-9]+)\])?\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/g, replace: (match, name, numArgs, definition) => {
-                if (readNewComd) {
-                    katexOptions.macros[name] = definition;
-                }
-                return '';
-            }},
-            { regex: /\\begin\{document\}/g, replace: () => { documentBegun = true; return ''; }},
-        ];
         const replacements = [
-            // Comments
-            { regex: /%%blank/g, replace: () => '<div style="height: 400px;"></div>' },
-            { regex: /%[^\n]*/g, replace: () => '' },
-
             // Document structure
             { regex: /\\title\{([^}]+)\}/g, replace: (match, title) => { titleHtml = `<h1>${title}</h1>`; return ''; } },
             { regex: /\\author\{(?:(?:\{[^{}]*\})|[^{}])*\}/g, replace: (match) => {
@@ -641,198 +620,6 @@
                 return '';
             }},
             { regex: /\\affiliation\{([^}]+)\}/g, replace: (match, affiliation) => { affiliationHtml = `<div class="affiliation">${affiliation.replace(/\\\\/g, '')}</div>`; return ''; } },
-            { regex: /\\maketitle/g, replace: () => {
-                document.getElementById('make-title').innerHTML = titleHtml + authorHtml + affiliationHtml;
-                const linksHtml = `View on<a href="https://github.com/${githubRepo}" target="_blank">Github</a>or<a href="https://arxiv.org/pdf/${arxivNum}" target="_blank">arXiv</a>`;
-                document.getElementById('tocLinks').innerHTML = linksHtml;
-                return '';
-            }},
-            { regex: /\\begin\{document\}/g, replace: () => { documentBegun = true; return ''; }},
-            { regex: /\\documentclass(?:\[[^\]]*\])?\{[^}]+\}|\\end\{document\}|\\onecolumngrid|\\twocolumngrid|\\bibliography[^\n]*/g, replace: () => '' },
-            { regex: /\\usepackage(?:\[[^\]]*\])?\{[^}]+\}/g, replace: () => '' },
-            { regex: /\\appendix/g, replace: () => { isAppx = true; sectionCounter=0; return ''; }},
-            
-            // Abstract
-            { regex: /\\begin\{abstract\}\s*((?:[^\\]|\\[^e])*?)\\end\{abstract\}/gs, replace: (match, content) => {
-                return `<div class="abstract">${content}</div>`;
-            }},
-            
-            // Sections
-            { regex: /\\section\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g, replace: (match, title, label) => {
-                sectionCounter++;
-                subsectionCounter = 0;
-                const sectionId = label ? `sec-${label}` : `sec-${sectionCounter}`;
-                subsecId = null;
-                const sectionHtml = `<h2 id="${sectionId}">${getSecName(sectionCounter)}. ${title}</h2>`;
-                if (label) {
-                    sectionLabels.set(label, getSecName(sectionCounter));
-                }
-                return sectionHtml;
-            }},
-            { regex: /\\subsection\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g, replace: (match, title, label) => {
-                subsectionCounter++;
-                const subsectionLetter = String.fromCharCode(64 + subsectionCounter);
-                const subsectionId = label ? `sec-${label}` : `sec-${sectionCounter}-${subsectionCounter}`;
-                const subsectionHtml = `<h3 class="subsection" id="${subsectionId}">${subsectionLetter}. ${title}</h3>`;
-                if (label) {
-                    subsectionLabels.set(label, getSecName(sectionCounter));
-                }
-                return subsectionHtml;
-            }},
-            
-            // Theorems, Lemmas, and Definitions
-            { regex: /\\begin\{(theorem|lemma|definition)\}(.*?)\\end\{\1\}/gs, replace: (match, type, content) => {
-                let counter;
-                let labels;
-                let prefix;
-                
-                switch(type) {
-                    case 'theorem':
-                        theoremCounter++;
-                        counter = theoremCounter;
-                        labels = thmLabels;
-                        prefix = 'thm';
-                        break;
-                    case 'lemma':
-                        lemmaCounter++;
-                        counter = lemmaCounter;
-                        labels = lemmaLabels;
-                        prefix = 'lem';
-                        break;
-                    case 'definition':
-                        definitionCounter++;
-                        counter = definitionCounter;
-                        labels = definitionLabels;
-                        prefix = 'def';
-                        break;
-                }
-                
-                // Parse optional title
-                const titleMatch = content.match(/\[(.*?)\]/);
-                const optionalText = titleMatch ? titleMatch[1] : '';
-                
-                // Parse label
-                const labelMatch = content.match(/\\label\{([^}]+):([^}]+)\}/);
-                const label = labelMatch ? labelMatch[2] : '';
-                const elementId = label ? `${prefix}-${label}` : `${prefix}-${counter}`;
-                labels.set(label, counter);
-                
-                // Remove the title and label from content
-                content = content.replace(/\[(.*?)\]/, '');
-                content = content.replace(/\\label\{[^}]+:[^}]+\}/, '');
-                
-                const optionalPart = optionalText ? ` (${optionalText})` : '';
-                const displayName = type.charAt(0).toUpperCase() + type.slice(1);
-                
-                return `<div class="theorem" id="${elementId}">
-                    <strong>${displayName} ${counter}${optionalPart}</strong>
-                    ${content}
-                </div>`;
-            }},
-            
-            // Figures
-            { regex: /\\begin\{figure\*?\}(.*?)\\end\{figure\*?\}/gs, replace: (match, content) => {
-                figureCounter++;
-                
-                // Check if it's a figure* environment
-                const isStarred = match.includes('figure*');
-                
-                // Parse label
-                const labelMatch = content.match(/\\label\{fig:([^}]+)\}/);
-                const label = labelMatch ? labelMatch[1] : '';
-                const figureId = label ? `fig-${label}` : `fig-${figureCounter}`;
-                figureLabels.set(label, figureCounter);
-                
-                // Parse caption
-                const captionMatch = content.match(/\\caption\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/);
-                let caption = '';
-                if (captionMatch){
-                    caption = captionMatch[1].trim();
-                }
-                
-                // Parse graphics with width parameter
-                const graphicsMatch = content.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/s);
-                const graphicsPath = graphicsMatch ? graphicsMatch[2].trim() : '';
-                const widthFactor = graphicsMatch && graphicsMatch[1] ? parseFloat(graphicsMatch[1]) : 1;
-                
-                // Remove parsed elements from content
-                content = content.replace(/\\label\{fig:[^}]+\}/, '');
-                content = content.replace(/\\caption\{[^}]+\}/, '');
-                content = content.replace(/\\includegraphics(?:\[[^\]]*\])?\s*\{[^}]+\}/s, '');
-                content = content.replace(/\\centering/, '');
-                
-                let figureContent = '';
-                if (graphicsPath) {
-                    if (!editMode) {
-                        // Show actual figure
-                        const fileExtension = graphicsPath.split('.').pop().toLowerCase();
-                        if (fileExtension === 'pdf') {
-                            figureContent = `<div style="text-align: center;">
-                                <iframe src="fig/${graphicsPath}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
-                                    style="width: ${widthFactor * 100}%; height: 600px; border: none;"
-                                    title="Figure ${figureCounter}">
-                                    <p>Your browser does not support PDFs. 
-                                    <a href="fig/${graphicsPath}" target="_blank">Click here to download the PDF</a>.</p>
-                                </iframe>
-                            </div>`;
-                        } else {
-                            figureContent = `<div style="text-align: center;">
-                                <img src="fig/${graphicsPath}" alt="Figure ${figureCounter}" style="width: ${widthFactor * 100}%;">
-                            </div>`;
-                        }
-                    } else {
-                        // Show placeholder
-                        figureContent = `<div style="width: 400px; height: 300px; border: 2px dashed #4a9eff; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #4a9eff;">
-                            <span>fig/${graphicsPath}</span>
-                        </div>`;
-                    }
-                }
-                
-                return `<div class="figure" id="${figureId}">
-                    ${figureContent}
-                    ${caption ? `<div class="figure-caption">Figure ${figureCounter}: ${caption}</div>` : ''}
-                </div>`;
-            }},
-            
-            // Tables
-            { regex: /\\begin\{table\*?\}(?:\[(.*?)\])?\s*(.*?)\\end\{table\*?\}/gs, replace: (match, placement, content) => {
-                tableCounter++;
-                
-                // Parse label
-                const labelMatch = content.match(/\\label\{tab:([^}]+)\}/);
-                const label = labelMatch ? labelMatch[1] : '';
-                const tableId = label ? `tab-${label}` : `tab-${tableCounter}`;
-                
-                // Parse caption
-                const captionMatch = content.match(/\\caption\{([^}]+)\}/);
-                const caption = captionMatch ? captionMatch[1] : '';
-                
-                // Parse tabular content
-                const tabularMatch = content.match(/\\begin\{tabular\}\{([^}]+)\}(.*?)\\end\{tabular\}/s);
-                if (!tabularMatch) return '';
-                
-                const columns = tabularMatch[1];
-                const tableContent = tabularMatch[2];
-                
-                // Parse table rows
-                const rows = tableContent
-                    .split(/(?:\\\\)?\s*\\hline/)
-                    .filter(row => row.trim())
-                    .map(row => {
-                        const cells = row.split('&').map(cell => cell.trim());
-                        return `<tr><td>${cells.join('</td><td>')}</td></tr>`;
-                    })
-                    .join('\n');
-                
-                return `<div class="table" id="${tableId}">
-                    <table class="centered-table">
-                        <tbody>
-                            ${rows}
-                        </tbody>
-                    </table>
-                    ${caption ? `<div class="table-caption">Table ${tableCounter}: ${caption}</div>` : ''}
-                </div>`;
-            }},
 
             // Proofs
             { regex: /\\pf\{([^}]+)\}/g, replace: (match, refName) => {
@@ -861,16 +648,6 @@
                 const id = `autoref-${autorefMap.size}`;
                 autorefMap.set(id, { type, label });
                 return `<span class="autoref-placeholder" data-id="${id}"></span>`;
-            }},
-            
-            // Equation labels
-            { regex: /\\begin\{equation\}(\\label\{eq:([^}]+)\})?/gs, replace: (match, hasLabel, label) => {
-                equationCounter++;
-                if (hasLabel) {
-                    equationLabels.set(label, equationCounter);
-                    equationInvMap.set(equationCounter, label);
-                }
-                return '\\begin{equation}';
             }},
             
             // Citations
@@ -912,42 +689,274 @@
             let env = '';
             for (let line of text.split('\n')) {
                 lineNum++;
-                if (env === '' && line.startsWith('\\begin{')) {
-                    env = line.substring(7, line.indexOf('}')).trim();
-                    html += parsePara(para, startLineNum);
-                    para = line.trim() + '\n';
-                    startLineNum = lineNum;
-                } else if (env !== '' && line.startsWith(`\\end{${env}}`) || line.trim() === '') {
-                    para += line.trim();
-                    html += parsePara(para, startLineNum);
+                line = line.trim();
+                if (line === '%region Ignore') {
+                    regionIgnore = true;
+                } else if (line === '%endregion') {
+                    regionIgnore = false;
+                } else if (regionIgnore){
+                    continue;
+                } else if (line.startsWith('%%')){
+                    if (line.startsWith('%%github:')) {
+                        githubRepo = line.substring(9).trim();
+                    } else if (line.startsWith('%%arxiv:')) {
+                        arxivNum = line.substring(8).trim();
+                    } else if (line.startsWith('%%edit:')) {
+                        editMode = line.substring(7).trim() !== 'off';
+                    } else if (line.startsWith('%%newcmd:')) {
+                        readNewComd = line.substring(9).trim() !== 'off';
+                    } else if (line.startsWith('%%blank')) {
+                        html += '<div style="height: 400px;"></div>';
+                    }
+                } else if (line.startsWith('\\newcommand') || line.startsWith('\\renewcommand')) {
+                    line.replace(/\\(?:re)?newcommand\{([^}]+)\}(?:\[([0-9]+)\])?\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/g, (match, name, numArgs, definition) => {
+                        if (readNewComd) {
+                            katexOptions.macros[name] = definition;
+                        }
+                        return '';
+                    });
+                } else if (line.startsWith('\\begin{document}')) {
+                    documentBegun = true;
                     para = '';
-                    env = '';
                     startLineNum = lineNum + 1;
-                } else {
-                    para += line.trim() + '\n';
+                } else if (line.startsWith('\\maketitle')) {
+                    document.getElementById('make-title').innerHTML = titleHtml + authorHtml + affiliationHtml;
+                    const linksHtml = `View on<a href="https://github.com/${githubRepo}" target="_blank">Github</a>or<a href="https://arxiv.org/pdf/${arxivNum}" target="_blank">arXiv</a>`;
+                    document.getElementById('tocLinks').innerHTML = linksHtml;
+                } else if (line.startsWith('\\appendix')) {
+                    isAppx = true; sectionCounter = 0;
+                } else if (line.startsWith('\\bibliography')) {
+                    continue;
+                } else if(documentBegun) { // Main text
+                    let cmtIdx = line.indexOf('%');
+                    if (cmtIdx !== -1 && !(cmtIdx > 0 && line[cmtIdx - 1] === '\\')) {
+                        line = line.substring(0, cmtIdx);
+                    }
+                    
+                    if (env === '' && line.startsWith('\\begin{')) {
+                        env = line.substring(7, line.indexOf('}')).trim();
+                        html += parsePara(para, startLineNum);
+                        para = line.substring(line.indexOf('}') + 1).trim();
+                        startLineNum = lineNum;
+                    } else if (env !== '' && line.startsWith(`\\end{${env}}`)){
+                        if (env.startsWith('figure')) {
+                            html += parseFigure(para, startLineNum);
+                        } else if (env.startsWith('table')) {
+                            html += parseTable(para, startLineNum);
+                        } else if (env === 'theorem' || env === 'lemma' || env === 'definition') {
+                            html += parseThm(env, para);
+                        } else if (env === 'equation' || env === 'align' || env === 'gather' || env === 'eqnarray') {
+                            html += parseEquation(`\\begin{${env}}${para}\\end{${env}}`, startLineNum);
+                        } else if (env === 'abstract') {
+                            html += `<div class="abstract">${para}</div>`;
+                        } else {
+                            html += parsePara(para, startLineNum);
+                        }
+                        para = '';
+                        env = '';
+                        startLineNum = lineNum + 1;
+                    } else if (line.trim() === '') {
+                        html += parsePara(para, startLineNum);
+                        para = '';
+                        env = '';
+                        startLineNum = lineNum + 1;
+                    } else if (line.startsWith('\\section') || line.startsWith('\\subsection')) {
+                        html += parsePara(para, startLineNum);
+                        para = '';
+                        env = '';
+                        html += line.replace(/\\section\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g, (match, title, label) => {
+                            sectionCounter++;
+                            subsectionCounter = 0;
+                            const sectionId = label ? `sec-${label}` : `sec-${sectionCounter}`;
+                            subsecId = null;
+                            const sectionHtml = `<h2 id="${sectionId}" line="${startLineNum}">${getSecName(sectionCounter)}. ${title}</h2>`;
+                            if (label) {
+                                sectionLabels.set(label, getSecName(sectionCounter));
+                            }
+                            return sectionHtml;
+                        }).replace(/\\subsection\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g,  (match, title, label) => {
+                            subsectionCounter++;
+                            const subsectionLetter = String.fromCharCode(64 + subsectionCounter);
+                            const subsectionId = label ? `sec-${label}` : `sec-${sectionCounter}-${subsectionCounter}`;
+                            const subsectionHtml = `<h3 class="subsection" id="${subsectionId}" line="${startLineNum}">${subsectionLetter}. ${title}</h3>`;
+                            if (label) {
+                                subsectionLabels.set(label, getSecName(sectionCounter));
+                            }
+                            return subsectionHtml;
+                        });
+                        startLineNum = lineNum + 1;
+                    } else {
+                        para += line.trim() + '\n';
+                    }
                 }
             }
             return html;
         }
 
         function parsePara(para, startLineNum) {
-            if (!documentBegun) {
-                preamble.forEach(({ regex, replace }) => {
-                    para = para.replace(regex, replace);
-                });
-                if (!documentBegun) {
-                    return '';
-                }
-            }
             replacements.forEach(({ regex, replace }) => {
                 para = para.replace(regex, replace);
             });
-            para = para.split('\n').map(line=>line.trim()).join(' ');
-            if (editMode && documentBegun) {
-                return `<p line="${startLineNum}">${para}</p>`;
-            } else {
-                return `<p>${para}</p>`;
+            para = para.replace('\n', ' ');
+            return para.trim() !== '' ? `<p line="${startLineNum}">${para}</p>` : '';
+        }
+
+        function parseFigure(content, startLineNum) {
+            figureCounter++;
+            
+            // Parse label
+            const labelMatch = content.match(/\\label\{fig:([^}]+)\}/);
+            const label = labelMatch ? labelMatch[1] : '';
+            const figureId = label ? `fig-${label}` : `fig-${figureCounter}`;
+            figureLabels.set(label, figureCounter);
+            
+            // Parse caption
+            const captionMatch = content.match(/\\caption\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/);
+            let caption = '';
+            if (captionMatch){
+                caption = captionMatch[1].trim();
             }
+            
+            // Parse graphics with width parameter
+            const graphicsMatch = content.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/s);
+            const graphicsPath = graphicsMatch ? graphicsMatch[2].trim() : '';
+            const widthFactor = graphicsMatch && graphicsMatch[1] ? parseFloat(graphicsMatch[1]) : 1;
+            
+            // Remove parsed elements from content
+            content = content.replace(/\\label\{fig:[^}]+\}/, '');
+            content = content.replace(/\\caption\{[^}]+\}/, '');
+            content = content.replace(/\\includegraphics(?:\[[^\]]*\])?\s*\{[^}]+\}/s, '');
+            content = content.replace(/\\centering/, '');
+            
+            let figureContent = '';
+            if (graphicsPath) {
+                if (!editMode) {
+                    // Show actual figure
+                    const fileExtension = graphicsPath.split('.').pop().toLowerCase();
+                    if (fileExtension === 'pdf') {
+                        figureContent = `<div style="text-align: center;">
+                            <iframe src="fig/${graphicsPath}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
+                                style="width: ${widthFactor * 100}%; height: 600px; border: none;"
+                                title="Figure ${figureCounter}">
+                                <p>Your browser does not support PDFs. 
+                                <a href="fig/${graphicsPath}" target="_blank">Click here to download the PDF</a>.</p>
+                            </iframe>
+                        </div>`;
+                    } else {
+                        figureContent = `<div style="text-align: center;">
+                            <img src="fig/${graphicsPath}" alt="Figure ${figureCounter}" style="width: ${widthFactor * 100}%;">
+                        </div>`;
+                    }
+                } else {
+                    // Show placeholder
+                    figureContent = `<div style="width: 400px; height: 300px; border: 2px dashed #4a9eff; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #4a9eff;">
+                        <span>fig/${graphicsPath}</span>
+                    </div>`;
+                }
+            }
+            
+            return `<div class="figure" id="${figureId}" line="${startLineNum}">
+                ${figureContent}
+                ${caption ? `<div class="figure-caption">Figure ${figureCounter}: ${caption}</div>` : ''}
+            </div>`;
+        }
+
+        function parseTable(content, startLineNum) {
+            tableCounter++;
+            
+            // Parse label
+            const labelMatch = content.match(/\\label\{tab:([^}]+)\}/);
+            const label = labelMatch ? labelMatch[1] : '';
+            const tableId = label ? `tab-${label}` : `tab-${tableCounter}`;
+            
+            // Parse caption
+            const captionMatch = content.match(/\\caption\{([^}]+)\}/);
+            const caption = captionMatch ? captionMatch[1] : '';
+            
+            // Parse tabular content
+            const tabularMatch = content.match(/\\begin\{tabular\}\{([^}]+)\}(.*?)\\end\{tabular\}/s);
+            if (!tabularMatch) return '';
+            
+            const columns = tabularMatch[1];
+            const tableContent = tabularMatch[2];
+            
+            // Parse table rows
+            const rows = tableContent
+                .split(/(?:\\\\)?\s*\\hline/)
+                .filter(row => row.trim())
+                .map(row => {
+                    const cells = row.split('&').map(cell => cell.trim());
+                    return `<tr><td>${cells.join('</td><td>')}</td></tr>`;
+                })
+                .join('\n');
+            
+            return `<div class="table" id="${tableId}" line="${startLineNum}">
+                <table class="centered-table">
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+                ${caption ? `<div class="table-caption">Table ${tableCounter}: ${caption}</div>` : ''}
+            </div>`;
+        }
+
+        function parseThm(type, content) {
+            let counter;
+            let labels;
+            let prefix;
+            
+            switch(type) {
+                case 'theorem':
+                    theoremCounter++;
+                    counter = theoremCounter;
+                    labels = thmLabels;
+                    prefix = 'thm';
+                    break;
+                case 'lemma':
+                    lemmaCounter++;
+                    counter = lemmaCounter;
+                    labels = lemmaLabels;
+                    prefix = 'lem';
+                    break;
+                case 'definition':
+                    definitionCounter++;
+                    counter = definitionCounter;
+                    labels = definitionLabels;
+                    prefix = 'def';
+                    break;
+            }
+            
+            // Parse optional title
+            const titleMatch = content.match(/\[(.*?)\]/);
+            const optionalText = titleMatch ? titleMatch[1] : '';
+            
+            // Parse label
+            const labelMatch = content.match(/\\label\{([^}]+):([^}]+)\}/);
+            const label = labelMatch ? labelMatch[2] : '';
+            const elementId = label ? `${prefix}-${label}` : `${prefix}-${counter}`;
+            labels.set(label, counter);
+            
+            // Remove the title and label from content
+            content = content.replace(/\[(.*?)\]/, '');
+            content = content.replace(/\\label\{[^}]+:[^}]+\}/, '');
+            
+            const optionalPart = optionalText ? ` (${optionalText})` : '';
+            const displayName = type.charAt(0).toUpperCase() + type.slice(1);
+            
+            return `<div class="theorem" id="${elementId}">
+                <strong>${displayName} ${counter}${optionalPart}</strong>
+                ${content}
+            </div>`;
+        }
+
+        function parseEquation(content, startLineNum) {
+            equationCounter++;
+            content = content.replace(/\\label\{eq:([^}]+)\}/, (match, label) => {
+                equationLabels.set(label, equationCounter);
+                equationInvMap.set(equationCounter, label);
+                return '';
+            });
+            return `<div line="${startLineNum}">${content}</div>`;
         }
 
         // Position tooltips
@@ -1205,24 +1214,26 @@
         });
 
         // Add click handler for line numbers
-        document.addEventListener('click', (e) => {
-            if (e.ctrlKey && editMode) {
-                let element = e.target;
-                while (element && !element.hasAttribute('line')) {
-                    element = element.parentElement;
+        if (editMode) {
+            document.addEventListener('click', (e) => {
+                if (e.ctrlKey) {
+                    let element = e.target;
+                    while (element && !element.hasAttribute('line')) {
+                        element = element.parentElement;
+                    }
+                    if (element && element.hasAttribute('line')) {
+                        const line = element.getAttribute('line');
+                        fetch('http://localhost:4999', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'text/plain',
+                            },
+                            body: line
+                        }).catch(error => console.error('Error sending line number:', error));
+                    }
                 }
-                if (element && element.hasAttribute('line')) {
-                    const line = element.getAttribute('line');
-                    fetch('http://localhost:4999', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'text/plain',
-                        },
-                        body: line
-                    }).catch(error => console.error('Error sending line number:', error));
-                }
-            }
-        });
+            });
+        }
     </script>
 </body>
 </html>
