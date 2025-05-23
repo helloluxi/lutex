@@ -549,30 +549,16 @@
         });
 
         // Hyperref
-        let lemmaCounter = 0;
-        let lemmaLabels = new Map();
-        let theoremCounter = 0;
-        const thmLabels = new Map();
-        let definitionCounter = 0;
-        const definitionLabels = new Map();
-        let figureCounter = 0;
-        const figureLabels = new Map();
-        let equationCounter = 0;
-        const equationLabels = new Map();
-        const equationInvMap = new Map();
-        let bibliography = null;
+        const thmLabels = [];
+        const figureLabels = [];
+        const equationLabels = [];
+        const citationOrder = [];
+        const sectionLabels = [];
+        const subsectionLabels = [];
+        const tableLabels = [];
         const citations = new Map();
-        const citationOrder = new Map();
-        let citationCounter = 0;
-        let sectionCounter = 0;
-        const sectionLabels = new Map();
-        let subsectionCounter = 0;
-        const subsectionLabels = new Map();
-        let tableCounter = 0;
-        const tableLabels = new Map();
         const autorefMap = new Map();
-        let sectionId = null;
-        let subsecId = null;
+        let bibliography = null;
 
         // Convert number to Roman numeral (1-10)
         const romanNumerals = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -613,83 +599,12 @@
         let editMode = true, readNewComd = false, regionIgnore = false;
         let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
         const getSecName = num => isAppx ? 'Appendix ' + String.fromCharCode(64 + num) : numberToRoman(num);
-        const paraReplacements = [
-            // Document structure
-            { regex: /\\title\{([^}]+)\}/g, replace: (match, title) => { titleHtml = `<h1>${title}</h1>`; return ''; } },
-            { regex: /\\author\{(?:(?:\{[^{}]*\})|[^{}])*\}/g, replace: (match) => {
-                const content = match.slice(8, -1);
-                authorHtml = `<div class="author">${content}</div>`;
-                return '';
-            }},
-            { regex: /\\affiliation\{([^}]+)\}/g, replace: (match, affiliation) => { affiliationHtml = `<div class="affiliation">${affiliation.replace(/\\\\/g, '')}</div>`; return ''; } }
-        ]
-        const globalReplacements = [
-            // Proofs
-            { regex: /\\pf\{([^}]+)\}/g, replace: (match, refName) => {
-                const refType = refName.split(':')[0];
-                const refLabel = refName.split(':')[1];
-                let refNum;
-                if (refType === 'thm' || refType === 'lem') {
-                    refNum = (refType === 'thm' ? thmLabels : lemmaLabels).get(refLabel);
-                    const key = `latex.${refType}${refNum}`;
-                    const displayName = refType === 'thm' ? `Theorem ${refNum}` : `Lemma ${refNum}`;
-                    const isExpanded = localStorage.getItem(key) === 'true';
-                    return `<div class="proof-panel ${isExpanded ? 'expanded' : 'collapsed'}">
-                        <div class="proof-toggle" onclick="toggleProof(this.parentElement, '${key}')">
-                            <span>Proof of&nbsp;&nbsp;</span><a href="#${refType}-${refNum}" onclick="event.stopPropagation()">${displayName}</a>
-                        </div>
-                        <div class="proof-content">`;
-                }
-                return '';
-            }},
-            { regex: /\\qed/g, replace: () => {
-                return `<span class="qed">&#x220E;</span></div></div>`;
-            }},
-            
-            // Cross-references
-            { regex: /\\autoref\{(eq|fig|sec|thm|lem|tab):([^}]+)\}/g, replace: (match, type, label) => {
-                const id = `autoref-${autorefMap.size}`;
-                autorefMap.set(id, { type, label });
-                return `<span class="autoref-placeholder" data-id="${id}"></span>`;
-            }},
-            
-            // Citations
-            { regex: /\\cite\{([^}]+)\}/g, replace: (match, refKeys) => {
-                const keys = refKeys.split(',').map(k => k.trim());
-                return keys.map(key => {
-                    const citation = citations.get(key);
-                    if (citation) {
-                        if (!citationOrder.has(key)) {
-                            citationCounter++;
-                            citationOrder.set(key, citationCounter);
-                            citation.number = citationCounter;
-                        }
-                        
-                        const tooltip = `[${citation.number}] ${citation.authors.join(', ')}, "${citation.title}", ${citation.journal} (${citation.year})`;
-                        const escapedTooltip = tooltip.replace(/"/g, '&quot;');
-                        return `<a class="citation" data-tooltip="${escapedTooltip}" data-key="${key}" onmouseover="showTooltip(this, event)" onmouseout="hideTooltip()" href="https://scholar.google.com/scholar?q=${encodeURIComponent(citation.title)}" target="_blank">[${citation.number}]</a>`;
-                    } else {
-                        return `<span style="color: orange;">[${key}]</span>`;
-                    }
-                }).join('');
-            }},
-            
-            // Miscellaneous
-            { regex: /\\todo\{([^}]*)}/g, replace: (match, content) => {
-                return `<span class="todo">(TODO: ${content.trim()})</span>`;
-            }},
-            { regex: /\\"o/g, replace: () => '&ouml;' },
-            { regex: /\\emph\{([^}]+)\}/g, replace: (match, content) => `<em>${content}</em>` },
-            { regex: /\\#/g, replace: () => '#' },
-            { regex: /~/g, replace: () => '&nbsp;' },
-        ];
-        
-        // Custom parser for LaTeX content
+        let html = '';
+        let startLineNum = 0;
         function parseLaTeX(text) {
-            let startLineNum = 0, lineNum = 0;
-            let para = '';
-            let html = '';
-            let env = '';
+            html = '';
+            startLineNum = 0;
+            let lineNum = 0, para = '', segEnv = '', labelEnv = '', labelIdx = 0;
             for (let line of text.split('\n')) {
                 lineNum++;
                 line = line.trim();
@@ -736,93 +651,222 @@
                     if (cmtIdx !== -1 && !(cmtIdx > 0 && line[cmtIdx - 1] === '\\')) {
                         line = line.substring(0, cmtIdx);
                     }
-                    
-                    if (env === '' && line.startsWith('\\begin{')) {
-                        env = line.substring(7, line.indexOf('}')).trim();
-                        html += parsePara(para, startLineNum);
-                        para = line.substring(line.indexOf('}') + 1).trim();
-                        startLineNum = lineNum;
-                    } else if (env !== '' && line.startsWith(`\\end{${env}}`)){
-                        if (env.startsWith('figure')) {
-                            html += parseFigure(para, startLineNum);
-                        } else if (env.startsWith('table')) {
-                            html += parseTable(para, startLineNum);
-                        } else if (env === 'theorem' || env === 'lemma' || env === 'definition') {
-                            html += parseThm(env, para);
-                        } else if (env === 'equation' || env === 'align' || env === 'gather' || env === 'eqnarray') {
-                            html += parseEquation(`\\begin{${env}}${para}\\end{${env}}`, startLineNum);
-                        } else if (env === 'abstract') {
-                            html += `<div class="abstract">${para}</div>`;
+
+                    if (line.startsWith('\\section')) {
+                        const sectionIdx = sectionLabels.length + 1;
+                        sectionLabels.push(`sec-${sectionIdx}`);
+                        subsectionLabels.push([]);
+                        labelEnv = 'sec';
+                        labelIdx = sectionIdx;
+                        const title = parsePairedBrace(line, 'section');
+                        html += `<h2 id="sec-${sectionIdx}" line="${startLineNum}">${getSecName(sectionIdx)}. ${title}</h2>`;
+                        startLineNum = lineNum + 1;
+                        line = line.substring(line.indexOf('}') + 1).trim();
+                    } else if (line.startsWith('\\subsection')) {
+                        const sectionIdx = sectionLabels.length, subsecIdx = subsectionLabels[sectionIdx - 1].length + 1;
+                        subsectionLabels[sectionIdx - 1].push(`sec-${sectionIdx}-${subsecIdx}`);
+                        labelEnv = 'subsec';
+                        labelIdx = subsecIdx;
+                        const subsectionLetter = String.fromCharCode(64 + subsecIdx);
+                        const title = parsePairedBrace(line, 'subsection');
+                        html += `<h3 class="subsection" id="sec-${sectionIdx}-${subsectionLetter}" line="${startLineNum}">${subsectionLetter}. ${title}</h3>`;
+                        startLineNum = lineNum + 1;
+                        line = line.substring(line.indexOf('}') + 1).trim();
+                    } else if (line.startsWith('\\begin{')) {
+                        const newEnv = line.substring(7, line.indexOf('}')).trim();
+                        if (newEnv === 'theorem' || newEnv === 'lemma' || newEnv === 'definition' || newEnv === 'corollary' || newEnv === 'example') {
+                            labelEnv = newEnv;
+                            labelIdx = thmLabels.length + 1;
+                            thmLabels.push(`${newEnv.substring(0, 3)}-${labelIdx}`);
+                            let displayName = `${newEnv[0].toUpperCase()}${newEnv.slice(1)} ${labelIdx} `;
+                            line.replace(/\[(.*?)\]/g, (match, label) => {
+                                displayName += `(${label}) `;
+                                return '';
+                            });
+                            html += `<div class="theorem" id="${newEnv.substring(0, 3)}-${labelIdx}"><strong>${displayName}</strong>`;
                         } else {
-                            html += parsePara(para, startLineNum);
+                            if (segEnv === ''){
+                                html += parsePara(para);
+                                para = '';
+                                segEnv = newEnv;
+                                startLineNum = lineNum;
+                            }
+
+                            if (newEnv === 'equation' || newEnv === 'align' || newEnv === 'gather' || newEnv === 'eqnarray') {
+                                labelEnv = 'eq';
+                                labelIdx = equationLabels.length + 1;
+                                equationLabels.push(`eq-${labelIdx}`);
+                                para += line + '\n';
+                            } else if (newEnv.startsWith('figure')) {
+                                labelEnv = 'fig';
+                                figureLabels.push(`fig-${figureLabels.length + 1}`);
+                            } else if (newEnv.startsWith('table')) {
+                                labelEnv = 'tab';
+                                tableLabels.push(`tab-${tableLabels.length + 1}`);
+                            } else if (newEnv != 'abstract') {
+                                para += `\\begin{${newEnv}}`;
+                            }
                         }
-                        para = '';
-                        env = '';
-                        startLineNum = lineNum + 1;
+                        line = line.substring(line.indexOf('}') + 1).trim();
+                    }
+
+                    line = line.replace(/\\label\{([^}]+)\}/g, (match, label) => {
+                        if (labelEnv === 'sec') {
+                            sectionLabels[labelIdx - 1] = label;
+                            autorefMap.set(label, [`#${label}`, isAppx ? `Appx.&nbsp;${String.fromCharCode(64 + labelIdx)}` : `Sec.&nbsp;${getSecName(labelIdx)}`]);
+                        } else if (labelEnv === 'subsec') {
+                            subsectionLabels[sectionLabels.length - 1][labelIdx - 1] = label;
+                            autorefMap.set(label, [`#${label}`, isAppx ? `Appx.&nbsp;${String.fromCharCode(64 + labelIdx)}.${String.fromCharCode(64 + labelIdx)}` : `Sec.&nbsp;${getSecName(labelIdx)}.${String.fromCharCode(64 + labelIdx)}`]);
+                        } else if (labelEnv === 'theorem' || labelEnv === 'lemma' || labelEnv === 'definition' || labelEnv === 'corollary' || labelEnv === 'example') {
+                            thmLabels[labelIdx - 1] = label;
+                            autorefMap.set(label, [`#${labelEnv.substring(0, 3)}-${labelIdx}`, `${labelEnv[0].toUpperCase()}${labelEnv.slice(1)}&nbsp;${labelIdx}`]);
+                        } else if (labelEnv === 'eq') {
+                            equationLabels[labelIdx - 1] = label;
+                            autorefMap.set(label, [`#eq-${labelIdx}`, `Eq.&nbsp;(${labelIdx})`]);
+                        } else if (labelEnv === 'fig') {
+                            figureLabels[labelIdx - 1] = label;
+                            autorefMap.set(label, [`#fig-${labelIdx}`, `Fig.&nbsp;${labelIdx}`]);
+                        } else if (labelEnv === 'tab') {
+                            tableLabels[labelIdx - 1] = label;
+                            autorefMap.set(label, [`#tab-${labelIdx}`, `Tab.&nbsp;${labelIdx}`]);
+                        }
+                        return '';
+                    });
+                    
+                    if (line.startsWith('\\end{')) {
+                        const endEnv = line.substring(5, line.indexOf('}')).trim();
+                        if (endEnv === 'theorem' || endEnv === 'lemma' || endEnv === 'definition' || endEnv === 'corollary' || endEnv === 'example') {
+                            html += '</div>';
+                            continue;
+                        }
+                        
+                        if (segEnv !== '' && endEnv === segEnv) {
+                            if (segEnv.startsWith('figure')) {
+                                html += parseFigure(para);
+                            } else if (segEnv.startsWith('table')) {
+                                html += parseTable(para);
+                            } else if (segEnv === 'theorem' || segEnv === 'lemma' || segEnv === 'definition') {
+                                html += '</div>';
+                            } else if (segEnv === 'equation' || segEnv === 'align' || segEnv === 'gather' || segEnv === 'eqnarray') {
+                                para += line;
+                                html += parseEquation(para, segEnv !== 'equation');
+                            } else if (segEnv === 'abstract') {
+                                html += `<div class="abstract">${para}</div>`;
+                            } else {
+                                html += parsePara(para);
+                            }
+                            para = '';
+                            segEnv = '';
+                            startLineNum = lineNum + 1;
+                        } else {
+                            para += line + '\n';
+                        }
                     } else if (isEmpty) {
-                        html += parsePara(para, startLineNum);
+                        html += parsePara(para);
                         para = '';
-                        env = '';
-                        startLineNum = lineNum + 1;
-                    } else if (line.startsWith('\\section') || line.startsWith('\\subsection')) {
-                        html += parsePara(para, startLineNum);
-                        para = '';
-                        env = '';
-                        html += line.replace(/\\section\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g, (match, title, label) => {
-                            sectionCounter++;
-                            subsectionCounter = 0;
-                            const sectionId = label ? `sec-${label}` : `sec-${sectionCounter}`;
-                            subsecId = null;
-                            const sectionHtml = `<h2 id="${sectionId}" line="${startLineNum}">${getSecName(sectionCounter)}. ${title}</h2>`;
-                            if (label) {
-                                sectionLabels.set(label, getSecName(sectionCounter));
-                            }
-                            return sectionHtml;
-                        }).replace(/\\subsection\{([^}]+)\}\s*(?:\\label\{sec:([^}]+)\})?/g,  (match, title, label) => {
-                            subsectionCounter++;
-                            const subsectionLetter = String.fromCharCode(64 + subsectionCounter);
-                            const subsectionId = label ? `sec-${label}` : `sec-${sectionCounter}-${subsectionCounter}`;
-                            const subsectionHtml = `<h3 class="subsection" id="${subsectionId}" line="${startLineNum}">${subsectionLetter}. ${title}</h3>`;
-                            if (label) {
-                                subsectionLabels.set(label, getSecName(sectionCounter));
-                            }
-                            return subsectionHtml;
-                        });
+                        segEnv = '';
                         startLineNum = lineNum + 1;
                     } else {
                         para += line.trim() + '\n';
                     }
                 }
             }
-            globalReplacements.forEach(({ regex, replace }) => {
-                html = html.replace(regex, replace);
-            });
-            return html;
+            return html.replace(
+                /\\pf\{([^}]+)\}/g, (match, label) => {
+                    if (!autorefMap.has(label)) {
+                        return `<div class="proof-panel">
+                        <div class="proof-toggle">
+                            <span>Proof of&nbsp;&nbsp;</span><span class="autoref-placeholder" data-id="${label}"></span>
+                        </div>
+                        <div class="proof-content">`;
+                    }
+                    const [href, displayName] = autorefMap.get(label);
+                    const isExpandedKey = `latex.${label}`;
+                    const isExpanded = localStorage.getItem(isExpandedKey) === 'true';
+                    return `<div class="proof-panel ${isExpanded ? 'expanded' : 'collapsed'}">
+                        <div class="proof-toggle" onclick="toggleProof(this.parentElement, '${isExpandedKey}')">
+                            <span>Proof of&nbsp;&nbsp;</span><a href="${href}" onclick="event.stopPropagation()">${displayName}</a>
+                        </div>
+                        <div class="proof-content">`;
+                }).replace(/\\qed/g, () => {
+                    return `<span class="qed">&#x220E;</span></div></div>`;
+                }).replace(/\\autoref\{([^}]+)\}/g, (match, label) => {
+                    if (!autorefMap.has(label)) {
+                        return `<span class="autoref-placeholder" data-id="${label}"></span>`;
+                    }
+                    const [href, displayName] = autorefMap.get(label);
+                    return `<a href="${href}" onclick="event.stopPropagation()">${displayName}</a>`;
+                }).replace(/\\cite\{([^}]+)\}/g, (match, refKeys) => {
+                    const keys = refKeys.split(',').map(k => k.trim());
+                    return keys.map(key => {
+                        const citation = citations.get(key);
+                        if (citation) {
+                            if (!citationOrder.includes(key)) {
+                                citationOrder.push(key);
+                                citation.number = citationOrder.indexOf(key) + 1;
+                            }
+                            
+                            const tooltip = `[${citation.number}] ${citation.authors.join(', ')}, "${citation.title}", ${citation.journal} (${citation.year})`;
+                            const escapedTooltip = tooltip.replace(/"/g, '&quot;');
+                            return `<a class="citation" data-tooltip="${escapedTooltip}" data-key="${key}" onmouseover="showTooltip(this, event)" onmouseout="hideTooltip()" href="https://scholar.google.com/scholar?q=${encodeURIComponent(citation.title)}" target="_blank">[${citation.number}]</a>`;
+                        } else {
+                            return `<span style="color: orange;">[${key}]</span>`;
+                        }
+                    }).join('');
+                }).replace(
+                    /\\todo\{([^}]*)}/g, (match, content) => {
+                    return `<span class="todo">(TODO: ${content.trim()})</span>`;
+                }).replace(
+                    /\\"o/g, () => '&ouml;'
+                ).replace(
+                    /\\emph\{([^}]+)\}/g, (match, content) => `<em>${content}</em>`
+                ).replace(
+                    /\\#/g, () => '#'
+                ).replace(
+                    /~/g, () => '&nbsp;'
+                );
         }
 
-        function parsePara(para, startLineNum) {
-            paraReplacements.forEach(({ regex, replace }) => {
-                para = para.replace(regex, replace);
-            });
-            para = para.replace('\n', ' ');
+        function parsePairedBrace(content, cmd){
+            let length = 0;
+            let start = content.indexOf(`\\${cmd}{`);
+            if (start !== -1) {
+                start += cmd.length + 2;
+                let braceCount = 1;
+                let i = start;
+                while (i < content.length && braceCount > 0) {
+                    if (content[i] === '{') braceCount++;
+                    if (content[i] === '}') braceCount--;
+                    if (braceCount > 0) length++;
+                    i++;
+                }
+            }
+            return content.substring(start, start + length);
+        }
+
+        function parsePara(para) {
+            para = para.replace(
+                /\\title\{([^}]+)\}/g, (match, title) => { titleHtml = `<h1>${title}</h1>`; return ''; }
+            ).replace(
+                /\\author\{(?:(?:\{[^{}]*\})|[^{}])*\}/g, (match) => {
+                    const content = match.slice(8, -1);
+                    authorHtml = `<div class="author">${content}</div>`;
+                    return '';
+                }
+            ).replace(
+                /\\affiliation\{([^}]+)\}/g, (match, affiliation) => { affiliationHtml = `<div class="affiliation">${affiliation.replace(/\\\\/g, '')}</div>`; return ''; }
+            ).replace(
+                '\n', ' '
+            );
             return para.trim() !== '' ? `<p line="${startLineNum}">${para}</p>` : '';
         }
 
-        function parseFigure(content, startLineNum) {
-            figureCounter++;
-            
-            // Parse label
-            const labelMatch = content.match(/\\label\{fig:([^}]+)\}/);
-            const label = labelMatch ? labelMatch[1] : '';
-            const figureId = label ? `fig-${label}` : `fig-${figureCounter}`;
-            figureLabels.set(label, figureCounter);
+        function parseFigure(content) {
+            const figureIdx = figureLabels.length + 1;
+            const figureId = `fig-${figureIdx}`;
             
             // Parse caption
-            const captionMatch = content.match(/\\caption\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/);
-            let caption = '';
-            if (captionMatch){
-                caption = captionMatch[1].trim();
-            }
+            const caption = parsePairedBrace(content, 'caption');
             
             // Parse graphics with width parameter
             const graphicsMatch = content.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/s);
@@ -831,7 +875,7 @@
             
             // Remove parsed elements from content
             content = content.replace(/\\label\{fig:[^}]+\}/, '');
-            content = content.replace(/\\caption\{[^}]+\}/, '');
+            content = content.replace(`\\caption{${caption}}`, '');
             content = content.replace(/\\includegraphics(?:\[[^\]]*\])?\s*\{[^}]+\}/s, '');
             content = content.replace(/\\centering/, '');
             
@@ -844,14 +888,14 @@
                         figureContent = `<div style="text-align: center;">
                             <iframe src="fig/${graphicsPath}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
                                 style="width: ${widthFactor * 100}%; height: 600px; border: none;"
-                                title="Figure ${figureCounter}">
+                                title="Figure ${figureIdx}">
                                 <p>Your browser does not support PDFs. 
                                 <a href="fig/${graphicsPath}" target="_blank">Click here to download the PDF</a>.</p>
                             </iframe>
                         </div>`;
                     } else {
                         figureContent = `<div style="text-align: center;">
-                            <img src="fig/${graphicsPath}" alt="Figure ${figureCounter}" style="width: ${widthFactor * 100}%;">
+                            <img src="fig/${graphicsPath}" alt="Figure ${figureIdx}" style="width: ${widthFactor * 100}%;">
                         </div>`;
                     }
                 } else {
@@ -864,22 +908,16 @@
             
             return `<div class="figure" id="${figureId}" line="${startLineNum}">
                 ${figureContent}
-                ${caption ? `<div class="figure-caption">Figure ${figureCounter}: ${caption}</div>` : ''}
+                ${caption ? `<div class="figure-caption">Figure ${figureIdx}: ${caption}</div>` : ''}
             </div>`;
         }
 
-        function parseTable(content, startLineNum) {
-            tableCounter++;
-            
-            // Parse label
-            const labelMatch = content.match(/\\label\{tab:([^}]+)\}/);
-            const label = labelMatch ? labelMatch[1] : '';
-            const tableId = label ? `tab-${label}` : `tab-${tableCounter}`;
-            tableLabels.set(label, tableCounter);
+        function parseTable(content) {
+            const tableIdx = tableLabels.length + 1;
+            const tableId = `tab-${tableIdx}`;
             
             // Parse caption
-            const captionMatch = content.match(/\\caption\{([^}]+)\}/);
-            const caption = captionMatch ? captionMatch[1] : '';
+            const caption = parsePairedBrace(content, 'caption');
             
             // Parse tabular content
             const tabularMatch = content.match(/\\begin\{tabular\}\{([^}]+)\}(.*?)\\end\{tabular\}/s);
@@ -904,67 +942,21 @@
                         ${rows}
                     </tbody>
                 </table>
-                ${caption ? `<div class="table-caption">Table ${tableCounter}: ${caption}</div>` : ''}
+                ${caption ? `<div class="table-caption">Table ${tableIdx}: ${caption}</div>` : ''}
             </div>`;
         }
 
-        function parseThm(type, content) {
-            let counter;
-            let labels;
-            let prefix;
-            
-            switch(type) {
-                case 'theorem':
-                    theoremCounter++;
-                    counter = theoremCounter;
-                    labels = thmLabels;
-                    prefix = 'thm';
-                    break;
-                case 'lemma':
-                    lemmaCounter++;
-                    counter = lemmaCounter;
-                    labels = lemmaLabels;
-                    prefix = 'lem';
-                    break;
-                case 'definition':
-                    definitionCounter++;
-                    counter = definitionCounter;
-                    labels = definitionLabels;
-                    prefix = 'def';
-                    break;
-            }
-            
-            // Parse optional title
-            const titleMatch = content.match(/\[(.*?)\]/);
-            const optionalText = titleMatch ? titleMatch[1] : '';
-            
-            // Parse label
-            const labelMatch = content.match(/\\label\{([^}]+):([^}]+)\}/);
-            const label = labelMatch ? labelMatch[2] : '';
-            const elementId = label ? `${prefix}-${label}` : `${prefix}-${counter}`;
-            labels.set(label, counter);
-            
-            // Remove the title and label from content
-            content = content.replace(/\[(.*?)\]/, '');
-            content = content.replace(/\\label\{[^}]+:[^}]+\}/, '');
-            
-            const optionalPart = optionalText ? ` (${optionalText})` : '';
-            const displayName = type.charAt(0).toUpperCase() + type.slice(1);
-            
-            return `<div class="theorem" id="${elementId}">
-                <strong>${displayName} ${counter}${optionalPart}</strong>
-                ${content}
-            </div>`;
-        }
-
-        function parseEquation(content, startLineNum) {
-            equationCounter++;
-            content = content.replace(/\\label\{eq:([^}]+)\}/, (match, label) => {
-                equationLabels.set(label, equationCounter);
-                equationInvMap.set(equationCounter, label);
+        function parseEquation(content, multiline) {
+            const eqIdx = equationLabels.length;
+            content = content.replace(/\\label\{([^}]+)\}/, (match, label) => {
+                equationLabels[eqIdx - 1] = label;
+                autorefMap.set(label, [`#eq-${eqIdx}`, `Eq. (${eqIdx})`]);
                 return '';
             });
-            return `<div line="${startLineNum}">${content}</div>`;
+            if (multiline) {
+                content.replace('\\\\', () => { equationLabels.push(`eq-${eqIdx}`); return '\\\\'; });
+            }
+            return `<div id="eq-${eqIdx}" line="${startLineNum}">${content}</div>`;
         }
 
         // Position tooltips
@@ -1050,37 +1042,6 @@
 
                     document.getElementById('content').innerHTML = html;
                     
-                    // Process autoref references
-                    document.querySelectorAll('.autoref-placeholder').forEach(placeholder => {
-                        const { type, label } = autorefMap.get(placeholder.getAttribute('data-id'));
-                        let replacement = '';
-                        
-                        if (type === 'eq') {
-                            replacement = `<a href="#eq-${label}">Eq.&nbsp;(${equationLabels.get(label)})</a>`;
-                        } else if (type === 'fig') {
-                            const figNum = figureLabels.get(label);
-                            replacement = figNum ? `<a href="#fig-${label}">Figure&nbsp;${figNum}</a>` : `Figure&nbsp;??`;
-                        } else if (type === 'sec') {
-                            const secLabel = sectionLabels.get(label) || subsectionLabels.get(label) || '??';
-                            replacement = secLabel ? (
-                                secLabel.startsWith('Appendix') ?
-                                `<a href="#sec-${label}">Appx.&nbsp;${secLabel.substring(9)}</a>` :
-                                `<a href="#sec-${label}">Sec.&nbsp;${secLabel}</a>`
-                            ) : `Sec.&nbsp;??`;
-                        } else if (type === 'thm') {
-                            const thmNum = thmLabels.get(label);
-                            replacement = thmNum ? `<a href="#thm-${label}">Theorem&nbsp;${thmNum}</a>` : `Theorem&nbsp;??`;
-                        } else if (type === 'lem') {
-                            const lemNum = lemmaLabels.get(label);
-                            replacement = lemNum ? `<a href="#lem-${label}">Lemma&nbsp;${lemNum}</a>` : `Lemma&nbsp;??`;
-                        } else if (type === 'tab') {
-                            const tabNum = tableLabels.get(label);
-                            replacement = tabNum ? `<a href="#tab-${label}">Table&nbsp;${tabNum}</a>` : `Table&nbsp;??`;
-                        }
-                        
-                        placeholder.outerHTML = replacement;
-                    });
-                    
                     const sortedCitations = Array.from(citations.entries())
                         .filter(([key, citation]) => citation.number > 0)
                         .sort((a, b) => a[1].number - b[1].number);
@@ -1135,13 +1096,6 @@
                         if (savedPosition !== null) {
                             window.scrollTo(0, parseInt(savedPosition, 10));
                         }
-                        // Label the equations
-                        document.querySelectorAll('.katex-display').forEach((display, index) => {
-                            const label = equationInvMap.get(index + 1);
-                            if (label) {
-                                display.setAttribute('id', `eq-${label}`);
-                            }
-                        });
                     }, 100);
                 })
                 .catch(error => console.error('Error loading LaTeX file:', error));
