@@ -696,12 +696,12 @@
                         html += parsePara(para);
                         startLineNum = lineNum + 1;
                         para = '';
-                        line = line.substring(line.indexOf('}') + 1).trim();
                         const pfLabel = line.substring(4, line.indexOf('}')).trim();
+                        line = line.substring(line.indexOf('}') + 1).trim();
                         if (!autorefMap.has(pfLabel)) {
                             html += `<div class="proof-panel">
                             <div class="proof-toggle">
-                                <span>Proof of&nbsp;&nbsp;</span><span class="autoref-placeholder" data-id="${pfLabel}"></span>
+                                <span>Proof of&nbsp;&nbsp;${pfLabel}</span>
                             </div>
                             <div class="proof-content">`;
                         } else {
@@ -785,6 +785,10 @@
                     if (line.startsWith('\\end{')) {
                         const endEnv = line.substring(5, line.indexOf('}')).trim();
                         if (endEnv === 'theorem' || endEnv === 'lemma' || endEnv === 'definition' || endEnv === 'corollary' || endEnv === 'example') {
+                            html += parsePara(para);
+                            para = '';
+                            segEnv = '';
+                            startLineNum = lineNum + 1;
                             html += '</div>';
                             continue;
                         }
