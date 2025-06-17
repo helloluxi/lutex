@@ -518,6 +518,24 @@
             display: inline;
             margin: 0 5px;
         }
+        .eqn-num {
+            cursor: pointer;
+        }
+        .eqn-hint {
+            position: absolute;
+            right: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-dark);
+            border: 1px solid var(--accent-dark);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -598,7 +616,9 @@
 
         let editMode = true, readNewComd = false, regionIgnore = false;
         let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
-        const getSecName = num => isAppx ? 'Appendix ' + String.fromCharCode(64 + num) : numberToRoman(num);
+        let numSecBeforeAppx = 999;
+        const getSecRef = num => num > numSecBeforeAppx ? 'Appx.&nbsp;' + String.fromCharCode(64 + num - numSecBeforeAppx) : 'Sec.&nbsp;' + numberToRoman(num);
+        const getSecName = num => num > numSecBeforeAppx ? 'Appendix ' + String.fromCharCode(64 + num - numSecBeforeAppx) : numberToRoman(num);
         let html = '';
         let startLineNum = 0;
         function parseLaTeX(text) {
@@ -642,10 +662,10 @@
                     const linksHtml = `View on<a href="https://github.com/${githubRepo}" target="_blank">Github</a>or<a href="https://arxiv.org/pdf/${arxivNum}" target="_blank">arXiv</a>`;
                     document.getElementById('tocLinks').innerHTML = linksHtml;
                 } else if (line.startsWith('\\appendix')) {
-                    isAppx = true; sectionCounter = 0;
+                    isAppx = true; numSecBeforeAppx = sectionLabels.length;
                 } else if (line.startsWith('\\bibliography')) {
                     continue;
-                } else if(documentBegun) { // Main text
+                } else if (documentBegun) { // Main text
                     let isEmpty = line.trim() === ''; // Do not move away
                     let cmtIdx = line.indexOf('%');
                     if (cmtIdx !== -1 && !(cmtIdx > 0 && line[cmtIdx - 1] === '\\')) {
@@ -672,6 +692,34 @@
                         html += `<h3 class="subsection" id="sec-${sectionIdx}-${subsectionLetter}" line="${startLineNum}">${subsectionLetter}. ${title}</h3>`;
                         startLineNum = lineNum + 1;
                         line = line.substring(line.indexOf('}') + 1).trim();
+                    } else if (line.startsWith('\\pf{')) {
+                        html += parsePara(para);
+                        startLineNum = lineNum + 1;
+                        para = '';
+                        line = line.substring(line.indexOf('}') + 1).trim();
+                        const pfLabel = line.substring(4, line.indexOf('}')).trim();
+                        if (!autorefMap.has(pfLabel)) {
+                            html += `<div class="proof-panel">
+                            <div class="proof-toggle">
+                                <span>Proof of&nbsp;&nbsp;</span><span class="autoref-placeholder" data-id="${pfLabel}"></span>
+                            </div>
+                            <div class="proof-content">`;
+                        } else {
+                            const [href, displayName] = autorefMap.get(pfLabel);
+                            const isExpandedKey = `latex.${pfLabel}`;
+                            const isExpanded = localStorage.getItem(isExpandedKey) === 'true';
+                            html += `<div class="proof-panel ${isExpanded ? 'expanded' : 'collapsed'}">
+                                <div class="proof-toggle" onclick="toggleProof(this.parentElement, '${isExpandedKey}')">
+                                    <span>Proof of&nbsp;&nbsp;</span><a href="${href}" onclick="event.stopPropagation()">${displayName}</a>
+                                </div>
+                                <div class="proof-content">`;
+                        }
+                    } else if (line == '\\qed') {
+                        html += parsePara(para);
+                        startLineNum = lineNum + 1;
+                        para = '';
+                        line = '';
+                        html += `<span class="qed">&#x220E;</span></div></div>`;
                     } else if (line.startsWith('\\begin{')) {
                         const newEnv = line.substring(7, line.indexOf('}')).trim();
                         if (newEnv === 'theorem' || newEnv === 'lemma' || newEnv === 'definition' || newEnv === 'corollary' || newEnv === 'example') {
@@ -713,10 +761,11 @@
                     line = line.replace(/\\label\{([^}]+)\}/g, (match, label) => {
                         if (labelEnv === 'sec') {
                             sectionLabels[labelIdx - 1] = label;
-                            autorefMap.set(label, [`#${label}`, isAppx ? `Appx.&nbsp;${String.fromCharCode(64 + labelIdx)}` : `Sec.&nbsp;${getSecName(labelIdx)}`]);
+                            autorefMap.set(label, [`#${label}`, getSecRef(labelIdx)]);
                         } else if (labelEnv === 'subsec') {
+                            const secIdx = sectionLabels.length;
                             subsectionLabels[sectionLabels.length - 1][labelIdx - 1] = label;
-                            autorefMap.set(label, [`#${label}`, isAppx ? `Appx.&nbsp;${String.fromCharCode(64 + labelIdx)}.${String.fromCharCode(64 + labelIdx)}` : `Sec.&nbsp;${getSecName(labelIdx)}.${String.fromCharCode(64 + labelIdx)}`]);
+                            autorefMap.set(label, [`#${label}`, getSecRef(secIdx) + '.' + String.fromCharCode(64 + labelIdx)]);
                         } else if (labelEnv === 'theorem' || labelEnv === 'lemma' || labelEnv === 'definition' || labelEnv === 'corollary' || labelEnv === 'example') {
                             thmLabels[labelIdx - 1] = label;
                             autorefMap.set(label, [`#${labelEnv.substring(0, 3)}-${labelIdx}`, `${labelEnv[0].toUpperCase()}${labelEnv.slice(1)}&nbsp;${labelIdx}`]);
@@ -771,26 +820,7 @@
                     }
                 }
             }
-            return html.replace(
-                /\\pf\{([^}]+)\}/g, (match, label) => {
-                    if (!autorefMap.has(label)) {
-                        return `<div class="proof-panel">
-                        <div class="proof-toggle">
-                            <span>Proof of&nbsp;&nbsp;</span><span class="autoref-placeholder" data-id="${label}"></span>
-                        </div>
-                        <div class="proof-content">`;
-                    }
-                    const [href, displayName] = autorefMap.get(label);
-                    const isExpandedKey = `latex.${label}`;
-                    const isExpanded = localStorage.getItem(isExpandedKey) === 'true';
-                    return `<div class="proof-panel ${isExpanded ? 'expanded' : 'collapsed'}">
-                        <div class="proof-toggle" onclick="toggleProof(this.parentElement, '${isExpandedKey}')">
-                            <span>Proof of&nbsp;&nbsp;</span><a href="${href}" onclick="event.stopPropagation()">${displayName}</a>
-                        </div>
-                        <div class="proof-content">`;
-                }).replace(/\\qed/g, () => {
-                    return `<span class="qed">&#x220E;</span></div></div>`;
-                }).replace(/\\autoref\{([^}]+)\}/g, (match, label) => {
+            return html.replace(/\\autoref\{([^}]+)\}/g, (match, label) => {
                     if (!autorefMap.has(label)) {
                         return `<span class="autoref-placeholder" data-id="${label}"></span>`;
                     }
@@ -1086,6 +1116,55 @@
                             displayMode: true
                         });
                         console.log('KaTeX rendering complete');
+                        if (editMode) {
+                            document.querySelectorAll('.eqn-num').forEach(el => {
+                                el.addEventListener('click', () => {
+                                    let parent = el;
+                                    let found = false;
+                                    let textToCopy = '';
+                                    
+                                    while (parent && parent !== document.body) {
+                                        const match = parent.id && parent.id.match(/^eq-(\d+)$/);
+                                        if (match) {
+                                            const num = parseInt(match[1], 10) - 1;
+                                            textToCopy = equationLabels[num] || '';
+                                            found = true;
+                                            break;
+                                        }
+                                        parent = parent.parentElement;
+                                    }
+
+                                    // Create hint element
+                                    const hint = document.createElement('div');
+                                    hint.className = 'eqn-hint';
+                                    document.body.appendChild(hint);
+                                    
+                                    // Position hint above the clicked element
+                                    const rect = el.getBoundingClientRect();
+                                    hint.style.right = '10px';
+                                    hint.style.top = `${rect.top + window.scrollY - 30}px`;
+
+                                    if (!found || textToCopy == parent.id) {
+                                        hint.textContent = 'No Label';
+                                    } else {
+                                        hint.textContent = `Copied: ${textToCopy}`;
+                                        navigator.clipboard.writeText(textToCopy);
+                                    }
+                                    
+                                    setTimeout(() => {
+                                        hint.style.opacity = '1';
+                                    }, 10);
+                                    setTimeout(() => {
+                                        hint.style.opacity = '0';
+                                        setTimeout(() => {
+                                            if (hint.parentNode) {
+                                                document.body.removeChild(hint);
+                                            }
+                                        }, 300);
+                                    }, 1000);
+                                });
+                            });
+                        }
                     } catch (error) {
                         console.error('KaTeX rendering error:', error);
                     }
@@ -1097,12 +1176,80 @@
                             window.scrollTo(0, parseInt(savedPosition, 10));
                         }
                     }, 100);
+
+                    // Set up scroll position tracking with delay and interruption handling
+                    let scrollTimer;
+                    let isNavigating = false;
+                    
+                    function saveScrollPosition() {
+                        if (isNavigating) return; // Don't save during navigation
+                        
+                        const currentPosition = window.scrollY;
+                        const oldPosition = localStorage.getItem('latex.scroll');
+                        
+                        // Only save if position is significantly different from current saved position
+                        if (!oldPosition || Math.abs(currentPosition - parseInt(oldPosition)) > 50) {
+                            // Push old position to previous, current to old, new to current
+                            const previousPosition = localStorage.getItem('latex.scroll');
+                            if (previousPosition) {
+                                localStorage.setItem('latex.scroll.previous', previousPosition);
+                            }
+                            localStorage.setItem('latex.scroll', currentPosition);
+                        }
+                    }
+                    
+                    window.addEventListener('scroll', () => {
+                        if (isNavigating) return; // Ignore scroll events during navigation
+                        
+                        // Cancel any pending save operation
+                        clearTimeout(scrollTimer);
+                        
+                        // Set new timer for 15 seconds
+                        scrollTimer = setTimeout(() => {
+                            saveScrollPosition();
+                        }, 15000);
+                    });
+                    
+                    // Handle browser back/forward buttons and mouse navigation
+                    function navigateHistory() {
+                        const previousPosition = localStorage.getItem('latex.scroll.previous');
+                        const currentPosition = window.scrollY;
+                        
+                        if (previousPosition) {
+                            window.scrollTo(0, parseInt(previousPosition));
+                            // Swap positions in localStorage
+                            localStorage.setItem('latex.scroll.previous', currentPosition);
+                            localStorage.setItem('latex.scroll', previousPosition);
+                            isNavigating = true;
+                            setTimeout(() => { isNavigating = false; }, 15000);
+                        }
+                    }
+                    
+                    // Handle mouse back/forward buttons
+                    window.addEventListener('mouseup', (e) => {
+                        if (e.button === 3 || e.button === 4) { // 3:Back button, 4:Forward button
+                            e.preventDefault();
+                            navigateHistory();
+                        }
+                    });
+                    
+                    // Handle keyboard shortcuts (Alt + Left/Right)
+                    window.addEventListener('keydown', (e) => {
+                        if (e.altKey && e.key === 'ArrowLeft') {
+                            e.preventDefault();
+                            navigateHistory(-1);
+                        } else if (e.altKey && e.key === 'ArrowRight') {
+                            e.preventDefault();
+                            navigateHistory(1);
+                        }
+                    });
                 })
                 .catch(error => console.error('Error loading LaTeX file:', error));
         }
 
         renderContent();
 
+        // Save position before unloading the page
         window.addEventListener('beforeunload', () => {
             localStorage.setItem('latex.scroll', window.scrollY);
         });
@@ -1182,8 +1329,8 @@
             tocContainer.classList.toggle('visible');
         });
 
-        // Add click handler for line numbers
         if (editMode) {
+            // Add click handler for line numbers
             document.addEventListener('dblclick', (e) => {
                 let element = e.target;
                 while (element && !element.hasAttribute('line')) {
