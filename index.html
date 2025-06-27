@@ -614,6 +614,7 @@
             }
         }
 
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         let editMode = true, readNewComd = false, regionIgnore = false;
         let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
         let numSecBeforeAppx = 999;
@@ -673,13 +674,18 @@
                     }
 
                     if (line.startsWith('\\section')) {
-                        const sectionIdx = sectionLabels.length + 1;
-                        sectionLabels.push(`sec-${sectionIdx}`);
-                        subsectionLabels.push([]);
-                        labelEnv = 'sec';
-                        labelIdx = sectionIdx;
-                        const title = parsePairedBrace(line, 'section');
-                        html += `<h2 id="sec-${sectionIdx}" line="${startLineNum}">${getSecName(sectionIdx)}. ${title}</h2>`;
+                        if (line.startsWith('\\section*')) {
+                            const title = parsePairedBrace(line, 'section*');
+                            html += `<h2 line="${startLineNum}">${title}</h2>`;
+                        } else {
+                            const sectionIdx = sectionLabels.length + 1;
+                            sectionLabels.push(`sec-${sectionIdx}`);
+                            subsectionLabels.push([]);
+                            labelEnv = 'sec';
+                            labelIdx = sectionIdx;
+                            const title = parsePairedBrace(line, 'section');
+                            html += `<h2 id="sec-${sectionIdx}" line="${startLineNum}">${getSecName(sectionIdx)}. ${title}</h2>`;
+                        }
                         startLineNum = lineNum + 1;
                         line = line.substring(line.indexOf('}') + 1).trim();
                     } else if (line.startsWith('\\subsection')) {
@@ -751,6 +757,8 @@
                             } else if (newEnv.startsWith('table')) {
                                 labelEnv = 'tab';
                                 tableLabels.push(`tab-${tableLabels.length + 1}`);
+                            } else if (newEnv === 'itemize') {
+                                html += `<ul class="itemize" line="${startLineNum}">`;
                             } else if (newEnv != 'abstract') {
                                 para += `\\begin{${newEnv}}`;
                             }
@@ -803,6 +811,8 @@
                             } else if (segEnv === 'equation' || segEnv === 'align' || segEnv === 'gather' || segEnv === 'eqnarray') {
                                 para += line;
                                 html += parseEquation(para, segEnv !== 'equation');
+                            } else if (segEnv == 'itemize') {
+                                html += para.split('\\item').slice(1).map(item => `<li>${item.trim()}</li>`).join('') + '</ul>';
                             } else if (segEnv === 'abstract') {
                                 html += `<div class="abstract">${para}</div>`;
                             } else {
@@ -915,7 +925,7 @@
             
             let figureContent = '';
             if (graphicsPath) {
-                if (!editMode) {
+                if (!editMode || !isLocalHost) {
                     // Show actual figure
                     const fileExtension = graphicsPath.split('.').pop().toLowerCase();
                     if (fileExtension === 'pdf') {
@@ -1120,7 +1130,7 @@
                             displayMode: true
                         });
                         console.log('KaTeX rendering complete');
-                        if (editMode) {
+                        if (isLocalHost) {
                             document.querySelectorAll('.eqn-num').forEach(el => {
                                 el.addEventListener('click', () => {
                                     let parent = el;
@@ -1333,7 +1343,7 @@
             tocContainer.classList.toggle('visible');
         });
 
-        if (editMode) {
+        if (isLocalHost) {
             // Add click handler for line numbers
             document.addEventListener('dblclick', (e) => {
                 let element = e.target;
