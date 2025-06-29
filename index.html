@@ -615,7 +615,7 @@
         }
 
         const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        let editMode = true, readNewComd = false, regionIgnore = false;
+        let readNewComd = false, regionIgnore = false;
         let githubRepo = '', arxivNum = '', isAppx = false, documentBegun = false, titleHtml = '', authorHtml = '', affiliationHtml = '';
         let numSecBeforeAppx = 999;
         const getSecRef = num => num > numSecBeforeAppx ? 'Appx.&nbsp;' + String.fromCharCode(64 + num - numSecBeforeAppx) : 'Sec.&nbsp;' + numberToRoman(num);
@@ -640,8 +640,6 @@
                         githubRepo = line.substring(9).trim();
                     } else if (line.startsWith('%%arxiv:')) {
                         arxivNum = line.substring(8).trim();
-                    } else if (line.startsWith('%%edit:')) {
-                        editMode = line.substring(7).trim() !== 'off';
                     } else if (line.startsWith('%%newcmd:')) {
                         readNewComd = line.substring(9).trim() !== 'off';
                     } else if (line.startsWith('%%blank')) {
@@ -753,10 +751,12 @@
                                 para += line + '\n';
                             } else if (newEnv.startsWith('figure')) {
                                 labelEnv = 'fig';
-                                figureLabels.push(`fig-${figureLabels.length + 1}`);
+                                labelIdx = figureLabels.length + 1;
+                                figureLabels.push(`fig-${labelIdx}`);
                             } else if (newEnv.startsWith('table')) {
                                 labelEnv = 'tab';
-                                tableLabels.push(`tab-${tableLabels.length + 1}`);
+                                labelIdx = tableLabels.length + 1;
+                                tableLabels.push(`tab-${labelIdx}`);
                             } else if (newEnv === 'itemize') {
                                 html += `<ul class="itemize" line="${startLineNum}">`;
                             } else if (newEnv != 'abstract') {
@@ -865,6 +865,8 @@
                 ).replace(
                     /\\emph\{([^}]+)\}/g, (match, content) => `<em>${content}</em>`
                 ).replace(
+                    /\\textbf\{([^}]+)\}/g, (match, content) => `<strong>${content}</strong>`
+                ).replace(
                     /\\#/g, () => '#'
                 ).replace(
                     /~/g, () => '&nbsp;'
@@ -925,13 +927,14 @@
             
             let figureContent = '';
             if (graphicsPath) {
-                if (!editMode || !isLocalHost) {
+                // if (!editMode || !isLocalHost) {
                     // Show actual figure
                     const fileExtension = graphicsPath.split('.').pop().toLowerCase();
+                    const heightPx = widthFactor * 0.75 * screen.width; // Assume 4:3 aspect ratio
                     if (fileExtension === 'pdf') {
                         figureContent = `<div style="text-align: center;">
                             <iframe src="fig/${graphicsPath}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
-                                style="width: ${widthFactor * 100}%; height: 600px; border: none;"
+                                style="width: ${widthFactor * 100}%; height: ${heightPx}px; border: none;"
                                 title="Figure ${figureIdx}">
                                 <p>Your browser does not support PDFs. 
                                 <a href="fig/${graphicsPath}" target="_blank">Click here to download the PDF</a>.</p>
@@ -942,12 +945,12 @@
                             <img src="fig/${graphicsPath}" alt="Figure ${figureIdx}" style="width: ${widthFactor * 100}%;">
                         </div>`;
                     }
-                } else {
-                    // Show placeholder
-                    figureContent = `<div style="width: 400px; height: 300px; border: 2px dashed #4a9eff; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #4a9eff;">
-                        <span>fig/${graphicsPath}</span>
-                    </div>`;
-                }
+                // } else {
+                //     // Show placeholder
+                //     figureContent = `<div style="width: 400px; height: 300px; border: 2px dashed #4a9eff; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #4a9eff;">
+                //         <span>fig/${graphicsPath}</span>
+                //     </div>`;
+                // }
             }
             
             return `<div class="figure" id="${figureId}" line="${startLineNum}">
