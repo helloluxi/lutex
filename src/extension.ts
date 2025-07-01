@@ -1,15 +1,26 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('LuTeX Line Jumper is now active!');
+    console.log('[LuTeX] Extension is now active!');
 
     // Function to handle line jumping
     const jumpToLine = (lineNumber: number) => {
-        vscode.workspace.findFiles('**/main.tex').then((files) => {
-            if (files.length > 0) {
-                const mainTexPath = files[0];
-                vscode.workspace.openTextDocument(mainTexPath).then((document) => {
+        // Look for both main.tex and main.md files
+        Promise.all([
+            vscode.workspace.findFiles('**/main.tex'),
+            vscode.workspace.findFiles('**/main.md')
+        ]).then((results) => {
+            const texFiles = results[0];
+            const mdFiles = results[1];
+            const allFiles = [...texFiles, ...mdFiles];
+            
+            if (allFiles.length > 0) {
+                // Prefer main.tex if both exist, otherwise use the first found
+                const mainFile = texFiles.length > 0 ? texFiles[0] : allFiles[0];
+                vscode.workspace.openTextDocument(mainFile).then((document) => {
                     vscode.window.showTextDocument(document).then((editor) => {
                         const position = new vscode.Position(lineNumber - 1, 0);
                         editor.selection = new vscode.Selection(position, position);
@@ -21,15 +32,39 @@ export function activate(context: vscode.ExtensionContext) {
                 });
             }
             // else {
-            //     vscode.window.showErrorMessage('Could not find main.tex in the workspace');
+            //     vscode.window.showErrorMessage('Could not find main.tex or main.md in the workspace');
             // }
         });
+    };
+
+    // Function to read port from config file
+    const getPortFromConfig = (): number => {
+        const defaultPort = 4999;
+        
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            return defaultPort;
+        }
+        
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        const configPath = path.join(workspaceRoot, '.vscode', 'config.json');
+        
+        try {
+            if (fs.existsSync(configPath)) {
+                const configContent = fs.readFileSync(configPath, 'utf8');
+                const config = JSON.parse(configContent);
+                return config.port || defaultPort;
+            }
+        } catch (error) {
+            console.log('Error reading config file, using default port:', error);
+        }
+        
+        return defaultPort;
     };
 
     // Create an HTTP server
     const httpServer = http.createServer((req, res) => {
         // Add CORS headers
-        res.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -68,21 +103,29 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // Check if main.tex exists and start server if it does
-    vscode.workspace.findFiles('**/main.tex').then((files) => {
-        if (files.length > 0) {
+    // Check if main.tex or main.md exists and start server if either does
+    Promise.all([
+        vscode.workspace.findFiles('**/main.tex'),
+        vscode.workspace.findFiles('**/main.md')
+    ]).then((results) => {
+        const texFiles = results[0];
+        const mdFiles = results[1];
+        const allFiles = [...texFiles, ...mdFiles];
+        
+        if (allFiles.length > 0) {
+            const port = getPortFromConfig();
             // Try to start the server
-            httpServer.listen(4999, 'localhost', () => {
-                console.log('HTTP Server listening on port 4999');
+            httpServer.listen(port, 'localhost', () => {
+                console.log(`HTTP Server listening on port ${port}`);
             }).on('error', (err: NodeJS.ErrnoException) => {
                 if (err.code === 'EADDRINUSE') {
-                    console.error('Port 4999 is already in use. Server not started.');
+                    console.error(`Port ${port} is already in use. Server not started.`);
                 } else {
                     console.error('Error starting server:', err);
                 }
             });
         } else {
-            console.log('No main.tex found in workspace. Server not started.');
+            console.log('No main.tex or main.md found in workspace. Server not started.');
         }
     });
 
