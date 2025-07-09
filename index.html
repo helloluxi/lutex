@@ -1354,13 +1354,17 @@
                     element = element.parentElement;
                 }
                 if (element && element.hasAttribute('line')) {
+                    const file = 'main.tex';
                     const line = element.getAttribute('line');
                     fetch('http://localhost:4999', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'text/plain',
+                            'Content-Type': 'application/json'
                         },
-                        body: line
+                        body: JSON.stringify({
+                            file,
+                            line
+                        })
                     }).catch(error => console.error('Error sending line number:', error));
                 }
             });
