@@ -4,61 +4,54 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
+    // Create a dedicated output channel for LuTeX
+    const outputChannel = vscode.window.createOutputChannel('LuTeX');
+    outputChannel.appendLine('[LuTeX] Extension is now active!');
     console.log('[LuTeX] Extension is now active!');
 
     // Function to handle line jumping
-    const jumpToLine = (lineNumber: number) => {
-        // Look for both main.tex and main.md files
-        Promise.all([
-            vscode.workspace.findFiles('**/main.tex'),
-            vscode.workspace.findFiles('**/main.md')
-        ]).then((results) => {
-            const texFiles = results[0];
-            const mdFiles = results[1];
-            const allFiles = [...texFiles, ...mdFiles];
-            
-            if (allFiles.length > 0) {
-                // Prefer main.tex if both exist, otherwise use the first found
-                const mainFile = texFiles.length > 0 ? texFiles[0] : allFiles[0];
-                vscode.workspace.openTextDocument(mainFile).then((document) => {
-                    vscode.window.showTextDocument(document).then((editor) => {
-                        const position = new vscode.Position(lineNumber - 1, 0);
-                        editor.selection = new vscode.Selection(position, position);
-                        editor.revealRange(
-                            new vscode.Range(position, position),
-                            vscode.TextEditorRevealType.InCenter
-                        );
-                    });
-                });
-            }
-            // else {
-            //     vscode.window.showErrorMessage('Could not find main.tex or main.md in the workspace');
-            // }
-        });
-    };
-
-    // Function to read port from config file
-    const getPortFromConfig = (): number => {
-        const defaultPort = 4999;
+    const jumpToLine = (fileName: string, lineNumber: number) => {
+        outputChannel.appendLine(`[LuTeX] Attempting to jump to file: ${fileName}, line: ${lineNumber}`);
         
+        // Look for the specific file starting from workspace root
         if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
-            return defaultPort;
+            const errorMsg = 'No workspace folder found';
+            outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+            console.log(errorMsg);
+            return;
         }
         
         const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-        const configPath = path.join(workspaceRoot, '.vscode', 'config.json');
+        const fullPath = path.join(workspaceRoot, fileName);
+        outputChannel.appendLine(`[LuTeX] Resolved full path: ${fullPath}`);
         
-        try {
-            if (fs.existsSync(configPath)) {
-                const configContent = fs.readFileSync(configPath, 'utf8');
-                const config = JSON.parse(configContent);
-                return config.port || defaultPort;
-            }
-        } catch (error) {
-            console.log('Error reading config file, using default port:', error);
+        // Check if the file exists at the specified path
+        if (fs.existsSync(fullPath)) {
+            outputChannel.appendLine(`[LuTeX] File exists, opening document...`);
+            const fileUri = vscode.Uri.file(fullPath);
+            vscode.workspace.openTextDocument(fileUri).then((document) => {
+                vscode.window.showTextDocument(document).then((editor) => {
+                    const position = new vscode.Position(lineNumber - 1, 0);
+                    editor.selection = new vscode.Selection(position, position);
+                    editor.revealRange(
+                        new vscode.Range(position, position),
+                        vscode.TextEditorRevealType.InCenter
+                    );
+                    outputChannel.appendLine(`[LuTeX] Successfully jumped to line ${lineNumber} in ${fileName}`);
+                });
+            });
+        } else {
+            const errorMsg = `Could not find file: ${fullPath}`;
+            outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+            console.log(errorMsg);
         }
-        
-        return defaultPort;
+    };
+
+    // Function to read port from VS Code configuration
+    const getPortFromSettings = (): number | null => {
+        const config = vscode.workspace.getConfiguration('lutex-ext');
+        const port = config.get<number>('port');
+        return port || null;
     };
 
     // Create an HTTP server
@@ -82,57 +75,90 @@ export function activate(context: vscode.ExtensionContext) {
             });
             req.on('end', () => {
                 try {
-                    const lineNumber = parseInt(body.trim());
-                    if (!isNaN(lineNumber)) {
-                        jumpToLine(lineNumber);
+                    const data = JSON.parse(body);
+                    const { file, line } = data;
+                    outputChannel.appendLine(`[LuTeX] Received { file: ${file}, line: ${line} }`);
+                    
+                    // Convert line to number if it's a string
+                    let lineNumber: number;
+                    if (typeof line === 'number') {
+                        lineNumber = line;
+                    } else if (typeof line === 'string') {
+                        lineNumber = parseInt(line, 10);
+                        if (isNaN(lineNumber)) {
+                            const errorMsg = `Invalid line number: ${line}. Must be a valid number.`;
+                            outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+                            res.writeHead(400, { 'Content-Type': 'text/plain' });
+                            res.end(errorMsg);
+                            return;
+                        }
+                    } else {
+                        const errorMsg = `Invalid line type: ${typeof line}. Must be a number or string.`;
+                        outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+                        res.writeHead(400, { 'Content-Type': 'text/plain' });
+                        res.end(errorMsg);
+                        return;
+                    }
+                    
+                    if (file && typeof file === 'string' && lineNumber > 0) {
+                        jumpToLine(file, lineNumber);
                         res.writeHead(200, { 'Content-Type': 'text/plain' });
                         res.end('Success');
                     } else {
+                        const errorMsg = 'Invalid request format. Expected JSON with file (string) and line (number > 0) properties.';
+                        outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
                         res.writeHead(400, { 'Content-Type': 'text/plain' });
-                        res.end('Invalid line number');
+                        res.end(errorMsg);
                     }
                 } catch (error) {
-                    console.error('Error processing HTTP data:', error);
+                    const errorMsg = `Error processing HTTP data: ${error}`;
+                    outputChannel.appendLine(`[LuTeX] ${errorMsg}`);
+                    console.error(errorMsg);
                     res.writeHead(500, { 'Content-Type': 'text/plain' });
                     res.end('Internal server error');
                 }
             });
         } else {
+            outputChannel.appendLine(`[LuTeX] Method not allowed: ${req.method}`);
             res.writeHead(405, { 'Content-Type': 'text/plain' });
             res.end('Method not allowed');
         }
     });
 
-    // Check if main.tex or main.md exists and start server if either does
-    Promise.all([
-        vscode.workspace.findFiles('**/main.tex'),
-        vscode.workspace.findFiles('**/main.md')
-    ]).then((results) => {
-        const texFiles = results[0];
-        const mdFiles = results[1];
-        const allFiles = [...texFiles, ...mdFiles];
-        
-        if (allFiles.length > 0) {
-            const port = getPortFromConfig();
-            // Try to start the server
-            httpServer.listen(port, 'localhost', () => {
-                console.log(`HTTP Server listening on port ${port}`);
-            }).on('error', (err: NodeJS.ErrnoException) => {
-                if (err.code === 'EADDRINUSE') {
-                    console.error(`Port ${port} is already in use. Server not started.`);
-                } else {
-                    console.error('Error starting server:', err);
-                }
-            });
-        } else {
-            console.log('No main.tex or main.md found in workspace. Server not started.');
-        }
-    });
+    // Check if port is configured in settings and start server if it is
+    const port = getPortFromSettings();
+    outputChannel.appendLine(`[LuTeX] Port from settings: ${port}`);
+    
+    if (port) {
+        // Try to start the server
+        outputChannel.appendLine(`[LuTeX] Starting HTTP server on port ${port}...`);
+        httpServer.listen(port, 'localhost', () => {
+            const successMsg = `HTTP Server listening on port ${port}`;
+            outputChannel.appendLine(`[LuTeX] ${successMsg}`);
+            console.log(successMsg);
+        }).on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code === 'EADDRINUSE') {
+                const errorMsg = `Port ${port} is already in use. Server not started.`;
+                outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+                console.error(errorMsg);
+            } else {
+                const errorMsg = `Error starting server: ${err}`;
+                outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+                console.error(errorMsg);
+            }
+        });
+    } else {
+        const msg = 'No port configured in settings. Server not started.';
+        outputChannel.appendLine(`[LuTeX] ${msg}`);
+        console.log(msg);
+    }
 
     // Clean up when the extension is deactivated
     context.subscriptions.push({
         dispose: () => {
+            outputChannel.appendLine('[LuTeX] Extension deactivating, closing HTTP server...');
             httpServer.close();
+            outputChannel.dispose();
         }
     });
 }

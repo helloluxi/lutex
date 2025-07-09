@@ -15,7 +15,19 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": []
+    "commands": [],
+    "configuration": {
+      "title": "LuTeX",
+      "properties": {
+        "lutex-ext.port": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port number for the HTTP server to listen on",
+          "minimum": 1024,
+          "maximum": 65535
+        }
+      }
+    }
   },
   "repository": {
     "type": "git",
