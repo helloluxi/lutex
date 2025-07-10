@@ -622,6 +622,7 @@
         const getSecName = num => num > numSecBeforeAppx ? 'Appendix ' + String.fromCharCode(64 + num - numSecBeforeAppx) : numberToRoman(num);
         let html = '';
         let startLineNum = 0;
+        let localHostPort = 4999;
         function parseLaTeX(text) {
             html = '';
             startLineNum = 0;
@@ -642,6 +643,8 @@
                         arxivNum = line.substring(8).trim();
                     } else if (line.startsWith('%%newcmd:')) {
                         readNewComd = line.substring(9).trim() !== 'off';
+                    } else if (line.startsWith('%%port:')) {
+                        localHostPort = parseInt(line.substring(7).trim() || '4999');
                     } else if (line.startsWith('%%blank')) {
                         html += '<div style="height: 400px;"></div>';
                     }
@@ -1356,7 +1359,7 @@
                 if (element && element.hasAttribute('line')) {
                     const file = 'main.tex';
                     const line = element.getAttribute('line');
-                    fetch('http://localhost:4999', {
+                    fetch(`http://localhost:${localHostPort}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
