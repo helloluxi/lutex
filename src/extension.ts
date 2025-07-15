@@ -7,12 +7,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Create a dedicated output channel for LuTeX
     const outputChannel = vscode.window.createOutputChannel('LuTeX');
     outputChannel.appendLine('[LuTeX] Extension is now active!');
-    console.log('[LuTeX] Extension is now active!');
 
     // Function to handle line jumping
     const jumpToLine = (fileName: string, lineNumber: number) => {
-        outputChannel.appendLine(`[LuTeX] Attempting to jump to file: ${fileName}, line: ${lineNumber}`);
-        
         // Look for the specific file starting from workspace root
         if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
             const errorMsg = 'No workspace folder found';
@@ -23,11 +20,9 @@ export function activate(context: vscode.ExtensionContext) {
         
         const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
         const fullPath = path.join(workspaceRoot, fileName);
-        outputChannel.appendLine(`[LuTeX] Resolved full path: ${fullPath}`);
         
         // Check if the file exists at the specified path
         if (fs.existsSync(fullPath)) {
-            outputChannel.appendLine(`[LuTeX] File exists, opening document...`);
             const fileUri = vscode.Uri.file(fullPath);
             vscode.workspace.openTextDocument(fileUri).then((document) => {
                 vscode.window.showTextDocument(document).then((editor) => {
@@ -37,7 +32,6 @@ export function activate(context: vscode.ExtensionContext) {
                         new vscode.Range(position, position),
                         vscode.TextEditorRevealType.InCenter
                     );
-                    outputChannel.appendLine(`[LuTeX] Successfully jumped to line ${lineNumber} in ${fileName}`);
                 });
             });
         } else {
@@ -127,15 +121,11 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Check if port is configured in settings and start server if it is
     const port = getPortFromSettings();
-    outputChannel.appendLine(`[LuTeX] Port from settings: ${port}`);
     
     if (port) {
         // Try to start the server
-        outputChannel.appendLine(`[LuTeX] Starting HTTP server on port ${port}...`);
         httpServer.listen(port, 'localhost', () => {
-            const successMsg = `HTTP Server listening on port ${port}`;
-            outputChannel.appendLine(`[LuTeX] ${successMsg}`);
-            console.log(successMsg);
+            outputChannel.appendLine(`[LuTeX] HttpServer started on port ${port}`);
         }).on('error', (err: NodeJS.ErrnoException) => {
             if (err.code === 'EADDRINUSE') {
                 const errorMsg = `Port ${port} is already in use. Server not started.`;
