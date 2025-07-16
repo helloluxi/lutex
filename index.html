@@ -202,7 +202,7 @@
         // Fetch and render content
         async function renderContent() {
             try {
-                const { metadata, sortedCitations } = await lutex.renderContent('main.tex', 'ref.bib');
+                await lutex.renderContent('main.tex', 'ref.bib');
 
                 generateTableOfContents();
 
@@ -217,67 +217,61 @@
                         displayMode: true
                     });
                     console.log('KaTeX rendering complete');
-
-                    // Handle equation number clicks for localhost
-                    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    if (isLocalHost) {
-                        document.querySelectorAll('.eqn-num').forEach(el => {
-                            el.addEventListener('click', () => {
-                                let parent = el;
-                                let found = false;
-                                let textToCopy = '';
-
-                                while (parent && parent !== document.body) {
-                                    const match = parent.id && parent.id.match(/^eq-(\d+)$/);
-                                    if (match) {
-                                        const num = parseInt(match[1], 10) - 1;
-                                        textToCopy = lutex.equationLabels[num] || '';
-                                        found = true;
-                                        break;
-                                    }
-                                    parent = parent.parentElement;
-                                }
-
-                                // Create hint element
-                                const hint = document.createElement('div');
-                                hint.className = 'eqn-hint';
-                                document.body.appendChild(hint);
-
-                                // Position hint above the clicked element
-                                const rect = el.getBoundingClientRect();
-                                hint.style.right = '10px';
-                                hint.style.top = `${rect.top + window.scrollY - 30}px`;
-
-                                if (!found || textToCopy == parent.id) {
-                                    hint.textContent = 'No Label';
-                                } else {
-                                    hint.textContent = `Copied: ${textToCopy}`;
-                                    navigator.clipboard.writeText(textToCopy);
-                                }
-
-                                setTimeout(() => {
-                                    hint.style.opacity = '1';
-                                }, 10);
-                                setTimeout(() => {
-                                    hint.style.opacity = '0';
-                                    setTimeout(() => {
-                                        if (hint.parentNode) {
-                                            document.body.removeChild(hint);
-                                        }
-                                    }, 300);
-                                }, 1000);
-                            });
-                        });
-                    }
                 } catch (error) {
                     console.error('KaTeX rendering error:', error);
                 }
 
                 setupScrollTracking();
+                setupCiteHover();
+                setupLocalhostJump();
             } catch (error) {
                 console.error('Error rendering content:', error);
             }
         }
+
+        // ===== SCROLL POSITION MANAGEMENT =====
+        // Save position before unloading the page
+        window.addEventListener('beforeunload', () => {
+            localStorage.setItem('latex.scroll', window.scrollY);
+        });
+
+        // ===== MENU INTERACTIONS =====
+
+        // Menu button interaction
+        const menuButton = document.getElementById('menuButton');
+        const tocContainer = document.getElementById('tocContainer');
+        let tocTimeout;
+
+        menuButton.addEventListener('mouseenter', () => {
+            clearTimeout(tocTimeout);
+            tocContainer.classList.add('visible');
+        });
+
+        menuButton.addEventListener('mouseleave', () => {
+            tocTimeout = setTimeout(() => {
+                if (!tocContainer.matches(':hover')) {
+                    tocContainer.classList.remove('visible');
+                }
+            }, 100);
+        });
+
+        tocContainer.addEventListener('mouseenter', () => {
+            clearTimeout(tocTimeout);
+            tocContainer.classList.add('visible');
+        });
+
+        tocContainer.addEventListener('mouseleave', () => {
+            tocTimeout = setTimeout(() => {
+                if (!menuButton.matches(':hover')) {
+                    tocContainer.classList.remove('visible');
+                }
+            }, 100);
+        });
+
+        menuButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            tocContainer.classList.toggle('visible');
+        });
 
         // ===== INITIALIZATION =====
         // Scroll position tracking
@@ -356,81 +350,96 @@
                     navigateHistory(1);
                 }
             });
+            
+            // ===== LOCALHOST INTEGRATION =====
+            const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocalHost && lutex.localHostPort !== 0) {
+                // Add click handler for line numbers
+                document.addEventListener('dblclick', (e) => {
+                    let element = e.target;
+                    while (element && !element.hasAttribute('line')) {
+                        element = element.parentElement;
+                    }
+                    if (element && element.hasAttribute('line')) {
+                        const file = 'main.tex';
+                        const line = element.getAttribute('line');
+                        fetch(`http://localhost:${lutex.localHostPort}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                file,
+                                line
+                            })
+                        }).catch(error => console.error('Error sending line number:', error));
+                    }
+                });
+                console.log(`Localhost integration enabled on port ${lutex.localHostPort}`);
+            }
         }
+        // Setup localhost jump for equation labels
+        function setupLocalhostJump() {
+            const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocalHost) {
+                document.querySelectorAll('.eqn-num').forEach(el => {
+                    el.addEventListener('click', () => {
+                        let parent = el;
+                        let found = false;
+                        let textToCopy = '';
 
-        renderContent();
+                        while (parent && parent !== document.body) {
+                            const match = parent.id && parent.id.match(/^eq-(\d+)$/);
+                            if (match) {
+                                const num = parseInt(match[1], 10) - 1;
+                                textToCopy = lutex.equationLabels[num] || '';
+                                found = true;
+                                break;
+                            }
+                            parent = parent.parentElement;
+                        }
 
-        // ===== SCROLL POSITION MANAGEMENT =====
-        // Save position before unloading the page
-        window.addEventListener('beforeunload', () => {
-            localStorage.setItem('latex.scroll', window.scrollY);
-        });
+                        // Create hint element
+                        const hint = document.createElement('div');
+                        hint.className = 'eqn-hint';
+                        document.body.appendChild(hint);
 
-        // ===== MENU INTERACTIONS =====
+                        // Position hint above the clicked element
+                        const rect = el.getBoundingClientRect();
+                        hint.style.right = '10px';
+                        hint.style.top = `${rect.top + window.scrollY - 30}px`;
 
-        // Menu button interaction
-        const menuButton = document.getElementById('menuButton');
-        const tocContainer = document.getElementById('tocContainer');
-        let tocTimeout;
+                        if (!found || textToCopy == parent.id) {
+                            hint.textContent = 'No Label';
+                        } else {
+                            hint.textContent = `Copied: ${textToCopy}`;
+                            navigator.clipboard.writeText(textToCopy);
+                        }
 
-        menuButton.addEventListener('mouseenter', () => {
-            clearTimeout(tocTimeout);
-            tocContainer.classList.add('visible');
-        });
-
-        menuButton.addEventListener('mouseleave', () => {
-            tocTimeout = setTimeout(() => {
-                if (!tocContainer.matches(':hover')) {
-                    tocContainer.classList.remove('visible');
-                }
-            }, 100);
-        });
-
-        tocContainer.addEventListener('mouseenter', () => {
-            clearTimeout(tocTimeout);
-            tocContainer.classList.add('visible');
-        });
-
-        tocContainer.addEventListener('mouseleave', () => {
-            tocTimeout = setTimeout(() => {
-                if (!menuButton.matches(':hover')) {
-                    tocContainer.classList.remove('visible');
-                }
-            }, 100);
-        });
-
-        menuButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            tocContainer.classList.toggle('visible');
-        });
-
-        // ===== LOCALHOST INTEGRATION =====
-        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-        if (isLocalHost) {
-            // Add click handler for line numbers
-            document.addEventListener('dblclick', (e) => {
-                let element = e.target;
-                while (element && !element.hasAttribute('line')) {
-                    element = element.parentElement;
-                }
-                if (element && element.hasAttribute('line')) {
-                    const file = 'main.tex';
-                    const line = element.getAttribute('line');
-                    fetch(`http://localhost:${lutex.localHostPort}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            file,
-                            line
-                        })
-                    }).catch(error => console.error('Error sending line number:', error));
-                }
+                        setTimeout(() => {
+                            hint.style.opacity = '1';
+                        }, 10);
+                        setTimeout(() => {
+                            hint.style.opacity = '0';
+                            setTimeout(() => {
+                                if (hint.parentNode) {
+                                    document.body.removeChild(hint);
+                                }
+                            }, 300);
+                        }, 1000);
+                    });
+                });
+            }
+        }
+        // Setup citation hover tooltips
+        function setupCiteHover() {
+            document.querySelectorAll('.citation').forEach(el => {
+                el.addEventListener('mouseover', (e) => showTooltip(el, e));
+                el.addEventListener('mouseout', hideTooltip);
             });
         }
 
+        renderContent();
     </script>
 </body>
 

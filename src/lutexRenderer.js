@@ -25,7 +25,7 @@ class LuTeXRenderer {
         this.numSecBeforeAppx = 999;
         this.html = '';
         this.startLineNum = 0;
-        this.localHostPort = 4999;
+        this.localHostPort = 0;
         
         // Roman numerals mapping (1-10)
         this.romanNumerals = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -52,51 +52,29 @@ class LuTeXRenderer {
 
     // Load and parse bibliography
     async loadBibliography(bibPath) {
-        try {
-            const response = await fetch(bibPath);
-            if (!response.ok) return;
-            const bibtex = await response.text();
-            this.bibliography = bibtexParse.toJSON(bibtex);
+        if (!bibPath) return;
+        const response = await fetch(bibPath);
+        if (!response.ok) return;
+        const bibtex = await response.text();
+        this.bibliography = bibtexParse.toJSON(bibtex);
 
-            // Process bibliography entries
-            this.bibliography.forEach(entry => {
-                const authors = entry.entryTags.author ? entry.entryTags.author.split(' and ').map(a => a.trim()) : [];
-                const firstAuthor = authors[0] ? authors[0].split(',').map(n => n.trim())[0] : '';
-                const year = entry.entryTags.year || '';
-                const title = entry.entryTags.title || '';
-                const journal = entry.entryTags.journal || entry.entryTags.booktitle || '';
+        // Process bibliography entries
+        this.bibliography.forEach(entry => {
+            const authors = entry.entryTags.author ? entry.entryTags.author.split(' and ').map(a => a.trim()) : [];
+            const firstAuthor = authors[0] ? authors[0].split(',').map(n => n.trim())[0] : '';
+            const year = entry.entryTags.year || '';
+            const title = entry.entryTags.title || '';
+            const journal = entry.entryTags.journal || entry.entryTags.booktitle || '';
 
-                this.citations.set(entry.citationKey, {
-                    authors: authors,
-                    title: title,
-                    journal: journal,
-                    year: year,
-                    firstAuthor: firstAuthor,
-                    number: 0
-                });
+            this.citations.set(entry.citationKey, {
+                authors: authors,
+                title: title,
+                journal: journal,
+                year: year,
+                firstAuthor: firstAuthor,
+                number: 0
             });
-        } catch (error) {
-            console.error('Error loading bibliography:', error);
-        }
-    }
-
-    // Get parsed document metadata
-    getDocumentMetadata() {
-        return {
-            title: this.titleHtml,
-            author: this.authorHtml,
-            affiliation: this.affiliationHtml,
-            githubRepo: this.githubRepo,
-            arxivNum: this.arxivNum,
-            localHostPort: this.localHostPort
-        };
-    }
-
-    // Get sorted citations for references section
-    getSortedCitations() {
-        return Array.from(this.citations.entries())
-            .filter(([key, citation]) => citation.number > 0)
-            .sort((a, b) => a[1].number - b[1].number);
+        });
     }
 
     // Render complete document content
@@ -105,57 +83,49 @@ class LuTeXRenderer {
         this.bibPath = bibPath;
         await this.loadBibliography(bibPath);
 
-        try {
-            const response = await fetch(texPath);
-            const text = await response.text();
-            const html = this.parseLaTeX(text);
-            
-            // Get document metadata
-            const metadata = this.getDocumentMetadata();
+        const response = await fetch(texPath);
+        const text = await response.text();
+        const html = this.parseLaTeX(text);
 
-            document.getElementById('content').innerHTML = html;
+        document.getElementById('content').innerHTML = html;
 
-            // Handle maketitle
-            if (metadata.title || metadata.author || metadata.affiliation) {
-                document.getElementById('make-title').innerHTML = metadata.title + metadata.author + metadata.affiliation;
-                const linksHtml = `View on<a href="https://github.com/${metadata.githubRepo}" target="_blank">Github</a>or<a href="https://arxiv.org/pdf/${metadata.arxivNum}" target="_blank">arXiv</a>`;
-                document.getElementById('tocLinks').innerHTML = linksHtml;
-            }
+        // Handle maketitle
+        if (this.titleHtml || this.authorHtml || this.affiliationHtml) {
+            document.getElementById('make-title').innerHTML = this.titleHtml + this.authorHtml + this.affiliationHtml;
+            const linksHtml = `View on<a href="https://github.com/${this.githubRepo}" target="_blank">Github</a>or<a href="https://arxiv.org/pdf/${this.arxivNum}" target="_blank">arXiv</a>`;
+            document.getElementById('tocLinks').innerHTML = linksHtml;
+        }
 
-            // Generate references section
-            const sortedCitations = this.getSortedCitations();
-            const referencesHtml = sortedCitations
-                .map(([key, citation]) => {
-                    const authors = citation.authors.map(author => {
-                        const parts = author.split(',');
-                        return parts.length > 1 ? `${parts[1].trim()} ${parts[0].trim()}` : author.trim() == 'others' ? 'et al.' : author.trim();
-                    }).join(', ');
-                    return `<div class="reference-item" id="ref-${key}">
-                                [${citation.number}] ${authors}, "${citation.title}", ${citation.journal} (${citation.year})
-                            </div>`;
-                })
-                .join('\n');
+        // Generate references section
+        const sortedCitations = Array.from(this.citations.entries())
+            .filter(([key, citation]) => citation.number > 0)
+            .sort((a, b) => a[1].number - b[1].number);
+        const referencesHtml = sortedCitations
+            .map(([key, citation]) => {
+                const authors = citation.authors.map(author => {
+                    const parts = author.split(',');
+                    return parts.length > 1 ? `${parts[1].trim()} ${parts[0].trim()}` : author.trim() == 'others' ? 'et al.' : author.trim();
+                }).join(', ');
+                return `<div class="reference-item" id="ref-${key}">
+                            [${citation.number}] ${authors}, "${citation.title}", ${citation.journal} (${citation.year})
+                        </div>`;
+            })
+            .join('\n');
 
-            const referencesDiv = document.getElementById('references');
-            if (sortedCitations.length > 0) {
-                referencesDiv.style.borderTop = '1px solid var(--accent-dark)';
-                referencesDiv.style.marginTop = '40px';
-                referencesDiv.style.paddingTop = '20px';
-                referencesDiv.innerHTML = `
-                            <h2 id="references-title">References</h2>
-                            ${referencesHtml}
-                        `;
-            } else {
-                referencesDiv.style.borderTop = 'none';
-                referencesDiv.style.marginTop = '0';
-                referencesDiv.style.paddingTop = '0';
-                referencesDiv.innerHTML = '';
-            }
-
-            return { metadata, sortedCitations };
-        } catch (error) {
-            console.error('Error loading LaTeX file:', error);
-            throw error;
+        const referencesDiv = document.getElementById('references');
+        if (sortedCitations.length > 0) {
+            referencesDiv.style.borderTop = '1px solid var(--accent-dark)';
+            referencesDiv.style.marginTop = '40px';
+            referencesDiv.style.paddingTop = '20px';
+            referencesDiv.innerHTML = `
+                        <h2 id="references-title">References</h2>
+                        ${referencesHtml}
+                    `;
+        } else {
+            referencesDiv.style.borderTop = 'none';
+            referencesDiv.style.marginTop = '0';
+            referencesDiv.style.paddingTop = '0';
+            referencesDiv.innerHTML = '';
         }
     }
 
@@ -182,7 +152,7 @@ class LuTeXRenderer {
                 } else if (line.startsWith('%%newcmd:')) {
                     this.readNewCmd = line.substring(9).trim() !== 'off';
                 } else if (line.startsWith('%%port:')) {
-                    this.localHostPort = parseInt(line.substring(7).trim() || '4999');
+                    this.localHostPort = parseInt(line.substring(7).trim() || '0');
                 } else if (line.startsWith('%%blank')) {
                     this.html += '<div style="height: 400px;"></div>';
                 }
@@ -393,7 +363,7 @@ class LuTeXRenderer {
 
                     const tooltip = `[${citation.number}] ${citation.authors.join(', ')}, "${citation.title}", ${citation.journal} (${citation.year})`;
                     const escapedTooltip = tooltip.replace(/"/g, '&quot;');
-                    return `<a class="citation" data-tooltip="${escapedTooltip}" data-key="${key}" onmouseover="showTooltip(this, event)" onmouseout="hideTooltip()" href="https://scholar.google.com/scholar?q=${encodeURIComponent(citation.title)}" target="_blank">[${citation.number}]</a>`;
+                    return `<a class="citation" data-tooltip="${escapedTooltip}" data-key="${key}" href="https://scholar.google.com/scholar?q=${encodeURIComponent(citation.title)}" target="_blank">[${citation.number}]</a>`;
                 } else {
                     return `<span style="color: orange;">[${key}]</span>`;
                 }

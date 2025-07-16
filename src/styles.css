@@ -22,6 +22,10 @@
     --caption-light: #666666;
     --table-header-light: #e6f0ff;
     --strong-light: #2332ff;
+
+    /* Theme button icons */
+    --theme-icon-dark: '☾';
+    --theme-icon-light: '☉';
 }
 
 body {
@@ -454,14 +458,15 @@ body.light-theme .centered-table tr:first-child td {
 }
 
 .theme-button::before {
-    content: '☉';
+    content: var(--theme-icon-dark);
     font-size: 20px;
     transition: all 0.3s ease;
     color: var(--accent-dark);
 }
 
-.theme-button.dark::before {
-    content: '☾';
+body.light-theme .theme-button::before {
+    content: var(--theme-icon-light);
+    color: var(--accent-light);
 }
 
 body.light-theme .theme-button {
