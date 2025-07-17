@@ -21,7 +21,7 @@
       "properties": {
         "lutex-ext.port": {
           "type": "number",
-          "default": 4999,
+          "default": 1024,
           "description": "Port number for the HTTP server to listen on",
           "minimum": 1024,
           "maximum": 65535

@@ -122,7 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Check if port is configured in settings and start server if it is
     const port = getPortFromSettings();
     
-    if (port) {
+    if (port && port !== 1024) {
         // Try to start the server
         httpServer.listen(port, 'localhost', () => {
             outputChannel.appendLine(`[LuTeX] HttpServer started on port ${port}`);
