@@ -585,3 +585,8 @@ body.light-theme .theme-button::before {
     pointer-events: none;
     white-space: nowrap;
 }
+
+.checkpoint {
+    width: 100%;
+    height: 400px;
+}

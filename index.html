@@ -284,59 +284,98 @@
                 }
             }, 100);
 
-            // Set up scroll position tracking with delay and interruption handling
-            let scrollTimer;
+            // Set up scroll position tracking with checkpoint navigation
             let isNavigating = false;
+            let currentCheckpointIndex = -1;
+            let naviPoints = [
+                { element: document.body, position: 0, type: 'start' }, // Document start
+                ...Array.from(document.querySelectorAll('h2')).map(el => ({
+                    element: el,
+                    position: el.offsetTop,
+                    type: 'h2'
+                })),
+                ...Array.from(document.querySelectorAll('h3')).map(el => ({
+                    element: el,
+                    position: el.offsetTop,
+                    type: 'h3'
+                })),
+                ...Array.from(document.querySelectorAll('.checkpoint')).map(el => ({
+                    element: el,
+                    position: el.offsetTop,
+                    type: 'checkpoint'
+                })),
+            ].sort((a, b) => a.position - b.position);
 
-            function saveScrollPosition() {
-                if (isNavigating) return; // Don't save during navigation
-
+            function findCurrentCheckpointIndex() {
                 const currentPosition = window.scrollY;
-                const oldPosition = localStorage.getItem('latex.scroll');
-
-                // Only save if position is significantly different from current saved position
-                if (!oldPosition || Math.abs(currentPosition - parseInt(oldPosition)) > 50) {
-                    // Push old position to previous, current to old, new to current
-                    const previousPosition = localStorage.getItem('latex.scroll');
-                    if (previousPosition) {
-                        localStorage.setItem('latex.scroll.previous', previousPosition);
+                
+                // Find the closest checkpoint to current position
+                let closestIndex = 0;
+                let minDistance = Math.abs(naviPoints[0].position - currentPosition);
+                
+                for (let i = 1; i < naviPoints.length; i++) {
+                    const distance = Math.abs(naviPoints[i].position - currentPosition);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestIndex = i;
                     }
-                    localStorage.setItem('latex.scroll', currentPosition);
                 }
+                
+                return closestIndex;
             }
 
+            function navigateToCheckpoint(direction) {
+                if (naviPoints.length === 0) return;
+
+                // Update current checkpoint index if not set or if position changed significantly
+                if (currentCheckpointIndex === -1) {
+                    currentCheckpointIndex = findCurrentCheckpointIndex();
+                }
+
+                // Navigate to next/previous checkpoint
+                if (direction === 1) { // Forward
+                    if (currentCheckpointIndex != naviPoints.length - 1) {
+                        currentCheckpointIndex++;
+                    }
+                } else { // Backward
+                    if (currentCheckpointIndex != 0) {
+                        currentCheckpointIndex--;
+                    }
+                }
+
+                const targetPoint = naviPoints[currentCheckpointIndex];
+                isNavigating = true;
+                
+                window.scrollTo({
+                    top: targetPoint.position,
+                    behavior: 'smooth'
+                });
+
+                // Save the new position
+                localStorage.setItem('latex.scroll', targetPoint.position);
+                
+                setTimeout(() => { isNavigating = false; }, 1000);
+            }
+
+            // Save scroll position periodically (simplified without previous tracking)
+            let scrollTimer;
             window.addEventListener('scroll', () => {
-                if (isNavigating) return; // Ignore scroll events during navigation
+                if (isNavigating) return;
 
-                // Cancel any pending save operation
                 clearTimeout(scrollTimer);
-
-                // Set new timer for 15 seconds
                 scrollTimer = setTimeout(() => {
-                    saveScrollPosition();
-                }, 15000);
+                    localStorage.setItem('latex.scroll', window.scrollY);
+                }, 1000);
             });
-
-            // Handle browser back/forward buttons and mouse navigation
-            function navigateHistory() {
-                const previousPosition = localStorage.getItem('latex.scroll.previous');
-                const currentPosition = window.scrollY;
-
-                if (previousPosition) {
-                    window.scrollTo(0, parseInt(previousPosition));
-                    // Swap positions in localStorage
-                    localStorage.setItem('latex.scroll.previous', currentPosition);
-                    localStorage.setItem('latex.scroll', previousPosition);
-                    isNavigating = true;
-                    setTimeout(() => { isNavigating = false; }, 15000);
-                }
-            }
 
             // Handle mouse back/forward buttons
             window.addEventListener('mouseup', (e) => {
-                if (e.button === 3 || e.button === 4) { // 3:Back button, 4:Forward button
+                if (e.button === 3) { // Back button
                     e.preventDefault();
-                    navigateHistory();
+                    navigateToCheckpoint(-1);
+                } else if (e.button === 4) { // Forward button
+                    e.preventDefault();
+                    navigateToCheckpoint(1);
                 }
             });
 
@@ -344,10 +383,10 @@
             window.addEventListener('keydown', (e) => {
                 if (e.altKey && e.key === 'ArrowLeft') {
                     e.preventDefault();
-                    navigateHistory(-1);
+                    navigateToCheckpoint(-1);
                 } else if (e.altKey && e.key === 'ArrowRight') {
                     e.preventDefault();
-                    navigateHistory(1);
+                    navigateToCheckpoint(1);
                 }
             });
             

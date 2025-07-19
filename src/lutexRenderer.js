@@ -28,7 +28,6 @@ class LuTeXRenderer {
         this.numSecBeforeAppx = 999;
         this.fileNameStack = [];
         this.lineNumStack = [];
-        this.basePath = '';
 
         // Constants
         this.romanNumerals = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -54,24 +53,20 @@ class LuTeXRenderer {
         this.lineNumStack[this.lineNumStack.length - 1] = num;
     }
 
+    tryAddExtension(fileName, ext) {
+        return fileName.includes('.') ? fileName : fileName + ext;
+    }
+
     // Reusable method to fetch file content with error handling
-    async fetchFileContent(fileName, addExtension = null) {
+    async fetchFileContent(fileName) {
         let fullFileName = fileName;
 
-        // Add extension if specified and not already present
-        if (addExtension && !fileName.includes('.')) {
-            fullFileName += addExtension;
-        }
-
-        // Construct full path using basePath
-        const fullPath = this.basePath ? `${this.basePath}/${fullFileName}` : fullFileName;
-
         try {
-            const response = await fetch(fullPath);
+            const response = await fetch(fullFileName);
             if (response.ok) {
                 return await response.text();
             } else {
-                console.error(`Could not load file: ${fullPath} (HTTP ${response.status})`);
+                console.error(`Could not load file: ${fullFileName} (HTTP ${response.status})`);
                 return null;
             }
         } catch (error) {
@@ -130,9 +125,6 @@ class LuTeXRenderer {
     async renderContent(texPath) {
         this.texPath = texPath;
         this.bibPath = null;
-
-        // Set base path for relative file resolution
-        this.basePath = texPath ? texPath.substring(0, texPath.lastIndexOf('/')) : '';
 
         // Initialize file stack with main file
         this.newFileName(texPath);
@@ -214,8 +206,8 @@ class LuTeXRenderer {
                 const inputMatch = line.match(/\\input\{([^}]+)\}/);
                 if (inputMatch) {
                     let inputFile = inputMatch[1].trim();
-
-                    const inputText = await this.fetchFileContent(inputFile, '.tex');
+                    inputFile = this.tryAddExtension(inputFile, '.tex');
+                    const inputText = await this.fetchFileContent(inputFile);
                     if (inputText) {
                         // Process paragraph before including file
                         if (para.trim() !== '') {
@@ -255,8 +247,8 @@ class LuTeXRenderer {
                     this.readNewCmd = line.substring(9).trim() !== 'off';
                 } else if (line.startsWith('%%port:')) {
                     this.localHostPort = parseInt(line.substring(7).trim() || '0');
-                } else if (line.startsWith('%%blank')) {
-                    html += '<div style="height: 400px;"></div>';
+                } else if (line.startsWith('%%check')) {
+                    html += '<div class="checkpoint"></div>';
                 }
             } else if (line.startsWith('\\newcommand') || line.startsWith('\\renewcommand')) {
                 line.replace(/\\(?:re)?newcommand\{([^}]+)\}(?:\[([0-9]+)\])?\{((?:[^{}]|\{[^{}]*\}|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*)\}/g, (match, name, numArgs, definition) => {
@@ -283,12 +275,7 @@ class LuTeXRenderer {
                 const bibMatch = line.match(/\\bibliography\{([^}]+)\}/);
                 if (bibMatch) {
                     let bibFile = bibMatch[1].trim();
-                    // Add .bib extension if not present
-                    if (!bibFile.includes('.')) {
-                        bibFile += '.bib';
-                    }
-                    // Use basePath for relative paths
-                    this.bibPath = this.basePath ? `${this.basePath}/${bibFile}` : bibFile;
+                    this.bibPath = this.tryAddExtension(bibFile, '.bib');
                 }
                 continue;
             } else if (this.documentBegun) { // Main text
