@@ -202,7 +202,7 @@
         // Fetch and render content
         async function renderContent() {
             try {
-                await lutex.renderContent('main.tex', 'ref.bib');
+                await lutex.renderContent('main.tex');
 
                 generateTableOfContents();
 
@@ -360,9 +360,10 @@
                     while (element && !element.hasAttribute('line')) {
                         element = element.parentElement;
                     }
-                    if (element && element.hasAttribute('line')) {
-                        const file = 'main.tex';
+                    if (element) {
+                        const file = element.getAttribute('file');
                         const line = element.getAttribute('line');
+                        if (!file || !line) return;
                         fetch(`http://localhost:${lutex.localHostPort}`, {
                             method: 'POST',
                             headers: {
