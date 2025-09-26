@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { registerMathCommands } from './mathCommands';
+import { registerFileCommands } from './fileCommands';
 import { registerBibtexCommands } from './bibtexCommands';
 import { HttpServerManager } from './httpServer';
 import { getPortFromSettings } from './settings';
@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
     outputChannel.appendLine('[LuTeX] Extension is now active!');
 
     // Register math transformation commands
-    registerMathCommands(context, outputChannel);
+    registerFileCommands(context, outputChannel);
     
     // Register BibTeX cleaning commands
     registerBibtexCommands(context, outputChannel);

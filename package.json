@@ -25,6 +25,11 @@
         "command": "lutex-ext.bibtexClean",
         "title": "BibTeX Clean",
         "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.texNormalization",
+        "title": "Tex Normalization",
+        "category": "LuTeX"
       }
     ],
     "configuration": {
