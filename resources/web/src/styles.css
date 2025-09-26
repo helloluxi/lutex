@@ -1,0 +1,489 @@
+:root {
+    /* Dark theme colors */
+    --bg-dark: #1a1a1a;
+    --text-dark: #ffffff;
+    --accent-dark: #4a9eff;
+    --accent-dark-hover: #80cfff;
+    --accent-dark-transparent: rgba(74, 158, 255, 0.1);
+    --accent-dark-border: rgba(74, 158, 255, 0.3);
+    --code-bg-dark: #2d2d2d;
+    --caption-dark: #cccccc;
+    --table-header-dark: #2d2d2d;
+    --strong-dark: #80cfff;
+
+    /* Light theme colors */
+    --bg-light: #ffffff;
+    --text-light: #1a1a1a;
+    --accent-light: #4a9eff;
+    --accent-light-hover: #80cfff;
+    --accent-light-transparent: rgba(74, 158, 255, 0.1);
+    --accent-light-border: rgba(74, 158, 255, 0.3);
+    --code-bg-light: #f0f0f0;
+    --caption-light: #666666;
+    --table-header-light: #e6f0ff;
+    --strong-light: #2332ff;
+
+    /* Theme button icons */
+    --theme-icon-dark: '☾';
+    --theme-icon-light: '☉';
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-dark);
+    font-family: Georgia, serif;
+    font-size: 20px;
+    line-height: 1.8;
+    margin: 0;
+    padding: 20px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.light-theme {
+    background-color: var(--bg-light);
+    color: var(--text-light);
+}
+
+body.light-theme .MathJax {
+    color: var(--text-light);
+}
+
+body.light-theme code {
+    background-color: var(--code-bg-light);
+}
+
+body.light-theme pre {
+    background-color: var(--code-bg-light);
+}
+
+body.light-theme .theorem {
+    background-color: var(--code-bg-light);
+}
+
+body.light-theme .abstract {
+    background-color: var(--code-bg-light);
+}
+
+body.light-theme .tooltip {
+    background-color: var(--code-bg-light);
+    color: var(--text-light);
+}
+
+body.light-theme .proof-panel {
+    background-color: var(--code-bg-light);
+}
+
+body.light-theme .figure-caption {
+    color: var(--caption-light);
+}
+
+body.light-theme .figure-caption .MathJax {
+    color: var(--caption-light) !important;
+}
+
+body.light-theme .table-caption {
+    color: var(--caption-light);
+}
+
+body.light-theme .table-caption .MathJax {
+    color: var(--caption-light) !important;
+}
+
+body.light-theme .MathJax table tr:first-child td {
+    background-color: var(--table-header-light);
+    color: var(--text-light);
+}
+
+body.light-theme .MathJax table tr:first-child td:first-child {
+    background-color: var(--table-header-light);
+    color: var(--text-light);
+}
+
+strong,
+em {
+    color: var(--strong-dark);
+}
+
+body.light-theme strong,
+body.light-theme em {
+    color: var(--strong-light);
+}
+
+body.light-theme h1,
+body.light-theme h2,
+body.light-theme h3 {
+    color: var(--accent-light);
+}
+
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+h1,
+h2,
+h3 {
+    color: var(--accent-dark);
+    text-align: center;
+}
+
+h3 {
+    font-size: 1.3em;
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+.MathJax {
+    color: var(--text-dark);
+}
+
+a {
+    text-decoration: none;
+    color: var(--accent-dark);
+}
+
+.autoref {
+    color: var(--accent-dark);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.autoref:hover {
+    color: var(--accent-dark-hover);
+    text-decoration: underline;
+}
+
+body.light-theme .autoref {
+    color: var(--accent-light);
+}
+
+body.light-theme .autoref:hover {
+    color: var(--accent-light-hover);
+}
+
+code {
+    background-color: var(--code-bg-dark);
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+pre {
+    background-color: var(--code-bg-dark);
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+}
+
+.theorem {
+    background-color: var(--code-bg-dark);
+    border-left: 4px solid var(--accent-dark);
+    padding: 10px;
+    margin: 10px 0;
+    font-style: italic;
+}
+
+.author {
+    text-align: center;
+    font-size: 1em;
+    margin: 0;
+    padding: 0;
+}
+
+.affiliation {
+    text-align: center;
+    font-style: italic;
+    font-size: 1em;
+    margin: 0;
+    padding: 0;
+    white-space: pre-line;
+}
+
+.abstract {
+    background-color: var(--code-bg-dark);
+    padding: 20px;
+    margin: 20px 0;
+    text-align: justify;
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+    text-indent: 2em;
+    border-radius: 20px;
+}
+
+.figure {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.figure-placeholder {
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    width: 720px; 
+    height: 240px; 
+    background: transparent; 
+    border: 2px dashed #2196f3; 
+    border-radius: 16px; 
+    color: #2196f3; 
+    font-style: italic;
+    margin: 0 auto;
+}
+
+.figure-caption {
+    margin-top: 10px;
+    font-style: italic;
+    color: var(--caption-dark);
+}
+
+.figure-caption .MathJax {
+    color: var(--caption-dark) !important;
+    font-style: italic !important;
+}
+
+.subfloats-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.subfloat {
+    text-align: center;
+    margin: 10px 0;
+}
+
+.subfloat-caption {
+    margin-top: 10px;
+    font-style: italic;
+    color: var(--caption-dark);
+    font-size: 0.9em;
+}
+
+body.light-theme .subfloat-caption {
+    color: var(--caption-light);
+}
+
+.figure-label {
+    font-weight: bold;
+}
+
+.citation {
+    color: var(--accent-dark);
+    cursor: pointer;
+    position: relative;
+    text-decoration: none;
+}
+
+.tooltip {
+    display: none;
+    position: fixed;
+    background-color: var(--code-bg-dark);
+    border: 1px solid var(--accent-dark);
+    border-radius: 5px;
+    padding: 10px;
+    z-index: 1000;
+    max-width: 600px;
+    width: max-content;
+    font-size: 16px;
+    line-height: 1.4;
+    white-space: normal;
+    color: var(--text-dark);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.citation.copied {
+    color: #4caf50;
+}
+
+.references {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--accent-dark);
+}
+
+.reference-item {
+    margin-bottom: 15px;
+    padding-left: 20px;
+    text-indent: -20px;
+}
+
+.todo {
+    color: #ff9800;
+    font-style: italic;
+}
+
+.qed {
+    display: inline-block;
+    font-size: 1.2em;
+    margin-left: auto;
+    vertical-align: middle;
+}
+
+.proof-panel {
+    background-color: var(--code-bg-dark);
+    border-left: 4px solid var(--accent-dark);
+    padding: 10px;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.proof-panel.collapsed {
+    max-height: 30px;
+    overflow: hidden;
+}
+
+.proof-panel.expanded {
+    max-height: none;
+}
+
+.proof-toggle {
+    color: var(--strong-dark);
+    font-weight: bold;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+}
+
+.proof-toggle::after {
+    content: '▼';
+    transition: transform 0.3s ease;
+    margin-left: auto;
+}
+
+.proof-panel.collapsed .proof-toggle::after {
+    transform: rotate(-90deg);
+}
+
+.proof-content {
+    margin-top: 10px;
+    text-align: left;
+}
+
+.proof-content p:first-child {
+    margin-top: 0;
+    text-indent: 0;
+}
+
+.proof-content p:last-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.proof-content p {
+    margin: 1em 0;
+}
+
+.proof-content .MathJax {
+    margin: 0 0.2em;
+}
+
+.MathJax table {
+    margin: 0 auto;
+    border-collapse: collapse;
+    width: auto;
+}
+
+.MathJax table td {
+    padding: 8px 12px;
+    border: 1px solid var(--accent-dark);
+    text-align: center;
+}
+
+.MathJax table tr:first-child td {
+    background-color: var(--table-header-dark);
+    text-align: left;
+}
+
+body.light-theme .MathJax table tr:first-child td {
+    background-color: var(--table-header-light);
+    color: var(--text-light);
+}
+
+.MathJax .table-caption {
+    margin-top: 10px;
+    font-style: italic;
+    color: var(--caption-dark);
+    text-align: center;
+}
+
+.table {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.table-caption {
+    margin-top: 10px;
+    font-style: italic;
+    color: var(--caption-dark);
+}
+
+.centered-table {
+    margin: 0 auto;
+    border-collapse: collapse;
+    width: auto;
+}
+
+.centered-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--accent-dark);
+    text-align: center;
+}
+
+.centered-table tr:first-child td {
+    font-weight: bold;
+    background-color: var(--table-header-dark);
+    text-align: center;
+}
+
+body.light-theme .centered-table tr:first-child td {
+    background-color: var(--table-header-light);
+    color: var(--text-light);
+}
+
+.centered-table tr:first-child td:first-child {
+    text-align: center;
+}
+
+.checkpoint {
+    width: 100%;
+    height: 400px;
+}
+
+/* Equation hint styles */
+.eqn-hint {
+    position: fixed;
+    background-color: var(--code-bg-dark);
+    color: var(--accent-dark);
+    border: 1px solid var(--accent-dark);
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+body.light-theme .eqn-hint {
+    background-color: var(--code-bg-light);
+    color: var(--accent-light);
+    border-color: var(--accent-light);
+}
+
+/* Equation number cursor style */
+.katex .tag {
+    cursor: pointer;
+}
+
+/* Additional styles for equation numbers */
+.equation .katex .tag,
+.katex-display .tag,
+span[class*="eqn-num"] {
+    cursor: pointer;
+}

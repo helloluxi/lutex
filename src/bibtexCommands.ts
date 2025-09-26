@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { toJSON, toBibtex, BibtexEntry } from './bibtexParser';
+import { toJSON, toBibtex, BibtexEntry } from './lib/bibtexParser';
 
 interface SimilarPair {
     a: string;

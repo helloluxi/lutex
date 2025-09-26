@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time LaTeX Renderer</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <link rel="stylesheet" href="src/styles.css">
+    <link rel="stylesheet" href="src/cmd.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script>
+        // KaTeX configuration
+        window.katexOptions = {
+            delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '$', right: '$', display: false },
+                { left: '\\begin{equation}', right: '\\end{equation}', display: true },
+                { left: '\\begin{equation*}', right: '\\end{equation*}', display: true },
+                { left: '\\begin{align}', right: '\\end{align}', display: true },
+                { left: '\\begin{align*}', right: '\\end{align*}', display: true },
+                { left: '\\begin{gather}', right: '\\end{gather}', display: true },
+                { left: '\\begin{gather*}', right: '\\end{gather*}', display: true },
+                { left: '\\begin{eqnarray}', right: '\\end{eqnarray}', display: true },
+                { left: '\\begin{eqnarray*}', right: '\\end{eqnarray*}', display: true },
+                { left: '\\[', right: '\\]', display: true }
+            ],
+            macros: {
+                '\\dd': '\\operatorname{d}',
+                '\\bm': '\\boldsymbol{#1}',
+                '\\ev': '\\left\\langle #1 \\right\\rangle',
+                '\\tr': '\\operatorname{tr}',
+                '\\norm': '\\left\\| #1 \\right\\|',
+                '\\ip': '\\left\\langle #1 \\middle| #2 \\right\\rangle',
+                '\\mel': '\\left\\langle #1 \\middle| #2 \\middle| #3 \\right\\rangle',
+                '\\dyad': '\\ket{#1}\\bra{#2}',
+                '\\ket': '\\left| #1 \\right\\rangle',
+                '\\bra': '\\left\\langle #1 \\right|',
+                '\\abs': '\\left| #1 \\right|',
+                '\\Re': '\\operatorname{Re}',
+                '\\Im': '\\operatorname{Im}',
+            },
+            throwOnError: false,
+            trust: true
+        };
+    </script>
+    <script src="src/bibtexParse.js"></script>
+    <script type="module" src="src/lutexEvent.js"></script>
+</head>
+
+<body>
+    <div id="make-title"></div>
+    <div class="container" id="content"></div>
+    <div class="references" id="references"></div>
+    
+    <!-- Command Bar -->
+    <div class="command-bar" id="command-bar" style="display: none;">
+        <div class="command-input-row">
+            <label for="command-input" class="command-prefix">></label>
+            <input type="text" class="command-input" id="command-input" placeholder="Enter command..." 
+                   autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
+        </div>
+        <div class="command-suggestions" id="command-suggestions"></div>
+    </div>
+</body>
+
+</html>

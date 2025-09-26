@@ -5,13 +5,10 @@
   "version": "0.0.1",
   "publisher": "xlu",
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
     "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -30,16 +27,53 @@
         "command": "lutex-ext.texNormalization",
         "title": "Tex Normalization",
         "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.launchRenderer",
+        "title": "Launch Renderer",
+        "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.closeRenderer",
+        "title": "Close Renderer",
+        "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.launchListener",
+        "title": "Launch Listener",
+        "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.closeListener",
+        "title": "Close Listener",
+        "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.launch",
+        "title": "Launch (Both)",
+        "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.close",
+        "title": "Close (Both)",
+        "category": "LuTeX"
       }
     ],
     "configuration": {
       "title": "LuTeX",
       "properties": {
-        "lutex-ext.port": {
+        "lutex-ext.rendererPort": {
           "type": "number",
-          "default": 1024,
-          "description": "Port number for the HTTP server to listen on",
-          "minimum": 1024,
+          "default": 0,
+          "description": "Port number for the LaTeX renderer server (0 = auto-detect)",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "lutex-ext.listenerPort": {
+          "type": "number",
+          "default": 0,
+          "description": "Port number for the line jumping listener server (0 = auto-detect)",
+          "minimum": 0,
           "maximum": 65535
         }
       }

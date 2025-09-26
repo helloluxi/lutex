@@ -1,1 +1,1 @@
-npm run package && code --install-extension lutex-ext-0.0.1.vsix
+code --install-extension lutex-ext-0.0.1.vsix
