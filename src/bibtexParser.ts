@@ -285,33 +285,83 @@ export function toJSON(bibtex: string): BibtexEntry[] {
 
 export function toBibtex(entries: BibtexEntry[], compact: boolean = true): string {
     let out = '';
-    const entrysep = compact ? ',' : ',\n';
-    const indent = compact ? '' : '    ';
+    
+    // Define field order for better human readability
+    const fieldOrder = [
+        'title', 'author', 'journal', 'booktitle', 'year', 'volume', 'number', 
+        'pages', 'month', 'publisher', 'address', 'edition', 'editor', 
+        'institution', 'organization', 'school', 'note', 'doi', 'url', 'isbn', 'issn'
+    ];
     
     for (const entry of entries) {
-        out += "@" + entry.entryType;
-        out += '{';
+        out += `@${entry.entryType.toLowerCase()}{`;
         
-        if (entry.citationKey) {
-            out += entry.citationKey + entrysep;
-        }
-        
-        if (entry.entry) {
-            out += entry.entry;
-        }
-        
-        if (entry.entryTags) {
-            let tags = indent;
-            for (const key in entry.entryTags) {
-                if (tags.trim().length !== 0) {
-                    tags += entrysep + indent;
-                }
-                tags += key + (compact ? '={' : ' = {') + entry.entryTags[key] + '}';
+        if (compact) {
+            // Compact format (original behavior)
+            if (entry.citationKey) {
+                out += entry.citationKey + ',';
             }
-            out += tags;
+            
+            if (entry.entry) {
+                out += entry.entry;
+            }
+            
+            if (entry.entryTags) {
+                let tags = '';
+                for (const key in entry.entryTags) {
+                    if (tags.length > 0) tags += ',';
+                    tags += key + '={' + entry.entryTags[key] + '}';
+                }
+                out += tags;
+            }
+            
+            out += '}\n';
+        } else {
+            // Human-readable format with proper indentation and field ordering
+            if (entry.citationKey) {
+                out += entry.citationKey + ',\n';
+            }
+            
+            if (entry.entry) {
+                out += '    ' + entry.entry + '\n';
+            }
+            
+            if (entry.entryTags) {
+                // Sort fields according to preferred order
+                const sortedKeys = Object.keys(entry.entryTags).sort((a, b) => {
+                    const aIndex = fieldOrder.indexOf(a.toLowerCase());
+                    const bIndex = fieldOrder.indexOf(b.toLowerCase());
+                    
+                    if (aIndex !== -1 && bIndex !== -1) {
+                        return aIndex - bIndex;
+                    } else if (aIndex !== -1) {
+                        return -1;
+                    } else if (bIndex !== -1) {
+                        return 1;
+                    } else {
+                        return a.localeCompare(b);
+                    }
+                });
+                
+                for (let i = 0; i < sortedKeys.length; i++) {
+                    const key = sortedKeys[i];
+                    const value = entry.entryTags[key];
+                    
+                    // Add proper indentation and alignment
+                    const paddedKey = key.padEnd(12); // Align values for readability
+                    out += `    ${paddedKey} = {${value}}`;
+                    
+                    // Add comma except for the last field
+                    if (i < sortedKeys.length - 1) {
+                        out += ',';
+                    }
+                    
+                    out += '\n';
+                }
+            }
+            
+            out += '}\n\n';
         }
-        
-        out += compact ? '}\n' : '\n}\n\n';
     }
     
     return out;

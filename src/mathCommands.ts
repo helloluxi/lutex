@@ -45,7 +45,8 @@ export function registerMathCommands(context: vscode.ExtensionContext, outputCha
     const inlineToDisplayCommand = vscode.commands.registerCommand('lutex-ext.inlineToDisplay', () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
-            vscode.window.showWarningMessage('No active editor found');
+            outputChannel.appendLine('[Inline to Display] No active editor found');
+            vscode.window.showErrorMessage('No active editor found');
             return;
         }
 
@@ -72,14 +73,15 @@ export function registerMathCommands(context: vscode.ExtensionContext, outputCha
                     editBuilder.replace(selection, transformedText);
                 });
 
-                outputChannel.appendLine(`[LuTeX] Converted ${pattern.description} to display format: ${content.trim()}`);
+                outputChannel.appendLine(`[Inline to Display] Converted ${pattern.description} to display format: ${content.trim()}`);
                 return;
             }
         }
 
         // If no pattern matched, show warning with supported formats
         const supportedFormats = transformPatterns.map(p => `${p.prefix}...${p.suffix}`).join(', ');
-        vscode.window.showWarningMessage(`Please select text with one of these formats: ${supportedFormats}`);
+        outputChannel.appendLine(`[Inline to Display] No matching pattern found for selected text`);
+        vscode.window.showErrorMessage(`Please select text with one of these formats: ${supportedFormats}`);
     });
 
     // Add the command to the context subscriptions

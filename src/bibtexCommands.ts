@@ -15,13 +15,15 @@ export function registerBibtexCommands(context: vscode.ExtensionContext, outputC
     const bibtexCleanCommand = vscode.commands.registerCommand('lutex-ext.bibtexClean', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
-            vscode.window.showWarningMessage('No active editor found');
+            outputChannel.appendLine('[BibTeX Clean] No active editor found');
+            vscode.window.showErrorMessage('No active editor found');
             return;
         }
 
         const document = editor.document;
         if (!document.fileName.endsWith('.bib')) {
-            vscode.window.showWarningMessage('Current file must be a .bib file');
+            outputChannel.appendLine('[BibTeX Clean] Current file is not a .bib file');
+            vscode.window.showErrorMessage('Current file must be a .bib file');
             return;
         }
 
@@ -29,7 +31,7 @@ export function registerBibtexCommands(context: vscode.ExtensionContext, outputC
             await cleanBibtexFile(document.fileName, outputChannel);
         } catch (error) {
             const errorMsg = `Error cleaning BibTeX file: ${error}`;
-            outputChannel.appendLine(`[LuTeX] ${errorMsg}`);
+            outputChannel.appendLine(`[BibTeX Clean] ${errorMsg}`);
             vscode.window.showErrorMessage(errorMsg);
         }
     });
@@ -38,31 +40,31 @@ export function registerBibtexCommands(context: vscode.ExtensionContext, outputC
 }
 
 async function cleanBibtexFile(bibFilePath: string, outputChannel: vscode.OutputChannel): Promise<void> {
-    outputChannel.appendLine(`[LuTeX] Starting BibTeX clean for: ${path.basename(bibFilePath)}`);
+    outputChannel.appendLine(`[BibTeX Clean] Starting clean for: ${path.basename(bibFilePath)}`);
 
     // Read and parse the BibTeX file
     const bibContent = fs.readFileSync(bibFilePath, 'utf8');
     const entries = toJSON(bibContent);
     const originalCount = entries.length;
     
-    outputChannel.appendLine(`[LuTeX] Parsed ${originalCount} entries`);
+    outputChannel.appendLine(`[BibTeX Clean] Parsed ${originalCount} entries`);
 
     // 1. Deduplicate by citation key
     const { kept: deduped, removed: duplicates } = dedupeEntries(entries);
-    outputChannel.appendLine(`[LuTeX] Removed ${duplicates.length} duplicate entries`);
+    outputChannel.appendLine(`[BibTeX Clean] Removed ${duplicates.length} duplicate entries`);
 
     // 2. Find similar titles
     const similarPairs = findSimilarTitles(deduped);
     let finalEntries = deduped;
     
     if (similarPairs.length > 0) {
-        outputChannel.appendLine(`[LuTeX] Found ${similarPairs.length} pairs with similar titles`);
+        outputChannel.appendLine(`[BibTeX Clean] Found ${similarPairs.length} pairs with similar titles`);
         
         const { replacements, toRemove } = await handleSimilarTitles(similarPairs, outputChannel);
         
         // Remove entries marked for removal
         finalEntries = deduped.filter(entry => !toRemove.has(entry.citationKey || ''));
-        outputChannel.appendLine(`[LuTeX] Removed ${toRemove.size} similar entries`);
+        outputChannel.appendLine(`[BibTeX Clean] Removed ${toRemove.size} similar entries`);
         
         // Apply replacements to .tex files
         if (replacements.size > 0) {
@@ -70,30 +72,39 @@ async function cleanBibtexFile(bibFilePath: string, outputChannel: vscode.Output
         }
     }
 
-    // 3. Find unused entries (if we have tex files)
+    // 3. Remove abstract entries and normalize months
+    const { cleaned: cleanedEntries, abstractsRemoved, monthsConverted } = cleanAndNormalizeEntries(finalEntries);
+    finalEntries = cleanedEntries;
+    outputChannel.appendLine(`[BibTeX Clean] Removed ${abstractsRemoved} abstract fields`);
+    outputChannel.appendLine(`[BibTeX Clean] Converted ${monthsConverted} month names to integers`);
+
+    // 4. Find unused entries (if we have tex files)
     const texFiles = await findTexFiles();
     if (texFiles.length > 0) {
         const { kept: pruned, pruned: unused } = await pruneUnusedEntries(finalEntries, texFiles);
         finalEntries = pruned;
-        outputChannel.appendLine(`[LuTeX] Removed ${unused.length} unused entries from ${texFiles.length} .tex files`);
+        outputChannel.appendLine(`[BibTeX Clean] Removed ${unused.length} unused entries from ${texFiles.length} .tex files`);
     } else {
-        outputChannel.appendLine(`[LuTeX] No .tex files found in workspace, skipping unused entry removal`);
+        outputChannel.appendLine(`[BibTeX Clean] No .tex files found in workspace, skipping unused entry removal`);
     }
 
-    // 4. Create backup and write cleaned file
+    // 5. Create backup and write cleaned file
     const backupPath = bibFilePath + '.backup';
     fs.copyFileSync(bibFilePath, backupPath);
-    outputChannel.appendLine(`[LuTeX] Created backup: ${path.basename(backupPath)}`);
+    outputChannel.appendLine(`[BibTeX Clean] Created backup: ${path.basename(backupPath)}`);
 
-    const cleanedContent = toBibtex(finalEntries, true);
+    const cleanedContent = toBibtex(finalEntries, false); // Use human-readable format
     fs.writeFileSync(bibFilePath, cleanedContent, 'utf8');
 
     const finalCount = finalEntries.length;
     const removedCount = originalCount - finalCount;
     
-    outputChannel.appendLine(`[LuTeX] Cleaning complete! Original: ${originalCount}, Final: ${finalCount}, Removed: ${removedCount}`);
+    outputChannel.appendLine(`[BibTeX Clean] Cleaning complete! Original: ${originalCount}, Final: ${finalCount}, Removed: ${removedCount}`);
+    outputChannel.appendLine(`[BibTeX Clean] Output written in human-readable format with proper field ordering`);
+    
+    // Show success message in VS Code window
     vscode.window.showInformationMessage(
-        `BibTeX cleaning complete! Removed ${removedCount} entries (${duplicates.length} duplicates, ${similarPairs.length} similar, ${originalCount - finalCount - duplicates.length - similarPairs.length} unused)`
+        `BibTeX cleaning complete! Processed ${originalCount} entries. Check LuTeX output channel for details.`
     );
 }
 
@@ -205,15 +216,15 @@ async function handleSimilarTitles(similarPairs: SimilarPair[], outputChannel: v
             case 'first':
                 replacements.set(pair.b, pair.a);
                 toRemove.add(pair.b);
-                outputChannel.appendLine(`[LuTeX] Will replace ${pair.b} → ${pair.a}`);
+                outputChannel.appendLine(`[BibTeX Clean] Will replace ${pair.b} → ${pair.a}`);
                 break;
             case 'second':
                 replacements.set(pair.a, pair.b);
                 toRemove.add(pair.a);
-                outputChannel.appendLine(`[LuTeX] Will replace ${pair.a} → ${pair.b}`);
+                outputChannel.appendLine(`[BibTeX Clean] Will replace ${pair.a} → ${pair.b}`);
                 break;
             case 'both':
-                outputChannel.appendLine(`[LuTeX] Keeping both ${pair.a} and ${pair.b}`);
+                outputChannel.appendLine(`[BibTeX Clean] Keeping both ${pair.a} and ${pair.b}`);
                 break;
         }
     }
@@ -241,7 +252,7 @@ async function applyReplacementsToTexFiles(replacements: Map<string, string>, ou
     const texFiles = await findTexFiles();
     if (texFiles.length === 0) return;
     
-    outputChannel.appendLine(`[LuTeX] Applying ${replacements.size} replacements to ${texFiles.length} .tex files`);
+    outputChannel.appendLine(`[BibTeX Clean] Applying ${replacements.size} replacements to ${texFiles.length} .tex files`);
     
     let totalReplacements = 0;
     
@@ -271,15 +282,16 @@ async function applyReplacementsToTexFiles(replacements: Map<string, string>, ou
             
             if (fileReplacements > 0) {
                 fs.writeFileSync(texFile, content, 'utf8');
-                outputChannel.appendLine(`[LuTeX] ${path.basename(texFile)}: ${fileReplacements} replacements`);
+                outputChannel.appendLine(`[BibTeX Clean] ${path.basename(texFile)}: ${fileReplacements} replacements`);
                 totalReplacements += fileReplacements;
             }
         } catch (error) {
-            outputChannel.appendLine(`[LuTeX] Error processing ${texFile}: ${error}`);
+            outputChannel.appendLine(`[BibTeX Clean] Error processing ${texFile}: ${error}`);
+            vscode.window.showErrorMessage(`Error processing ${path.basename(texFile)}: ${error}`);
         }
     }
     
-    outputChannel.appendLine(`[LuTeX] Total citation replacements: ${totalReplacements}`);
+    outputChannel.appendLine(`[BibTeX Clean] Total citation replacements: ${totalReplacements}`);
 }
 
 async function pruneUnusedEntries(entries: BibtexEntry[], texFiles: string[]): Promise<{ kept: BibtexEntry[], pruned: BibtexEntry[] }> {
@@ -311,6 +323,54 @@ async function pruneUnusedEntries(entries: BibtexEntry[], texFiles: string[]): P
     }
     
     return { kept, pruned };
+}
+
+function cleanAndNormalizeEntries(entries: BibtexEntry[]): { cleaned: BibtexEntry[], abstractsRemoved: number, monthsConverted: number } {
+    const monthMap: { [key: string]: string } = {
+        'january': '1', 'jan': '1',
+        'february': '2', 'feb': '2',
+        'march': '3', 'mar': '3',
+        'april': '4', 'apr': '4',
+        'may': '5',
+        'june': '6', 'jun': '6',
+        'july': '7', 'jul': '7',
+        'august': '8', 'aug': '8',
+        'september': '9', 'sep': '9', 'sept': '9',
+        'october': '10', 'oct': '10',
+        'november': '11', 'nov': '11',
+        'december': '12', 'dec': '12'
+    };
+
+    let abstractsRemoved = 0;
+    let monthsConverted = 0;
+
+    const cleaned = entries.map(entry => {
+        const cleanedEntry: BibtexEntry = {
+            ...entry,
+            entryTags: entry.entryTags ? { ...entry.entryTags } : undefined
+        };
+
+        if (cleanedEntry.entryTags) {
+            // Remove abstract field
+            if (cleanedEntry.entryTags.abstract) {
+                delete cleanedEntry.entryTags.abstract;
+                abstractsRemoved++;
+            }
+
+            // Convert month names to integers
+            if (cleanedEntry.entryTags.month) {
+                const monthValue = cleanedEntry.entryTags.month.toLowerCase().trim();
+                if (monthMap[monthValue]) {
+                    cleanedEntry.entryTags.month = monthMap[monthValue];
+                    monthsConverted++;
+                }
+            }
+        }
+
+        return cleanedEntry;
+    });
+
+    return { cleaned, abstractsRemoved, monthsConverted };
 }
 
 function escapeRegex(string: string): string {

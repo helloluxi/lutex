@@ -24,9 +24,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (port && port !== 1024) {
         httpServerManager.start(port);
     } else {
-        const msg = 'No port configured in settings. Server not started.';
-        outputChannel.appendLine(`[LuTeX] ${msg}`);
-        console.log(msg);
+        outputChannel.appendLine(`[LuTeX] No port configured in settings. Server not started.`);
     }
 
     // Clean up when the extension is deactivated

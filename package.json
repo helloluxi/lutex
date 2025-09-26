@@ -61,8 +61,5 @@
     "@vscode/vsce": "^2.15.0",
     "eslint": "^8.13.0",
     "typescript": "^5.9.2"
-  },
-  "dependencies": {
-    "net": "^1.0.2"
   }
 }

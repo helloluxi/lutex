@@ -28,7 +28,7 @@ export class HttpServerManager {
             if (req.method === 'POST') {
                 this.handlePostRequest(req, res);
             } else {
-                this.outputChannel.appendLine(`[LuTeX] Method not allowed: ${req.method}`);
+                this.outputChannel.appendLine(`[HTTP Server] Method not allowed: ${req.method}`);
                 res.writeHead(405, { 'Content-Type': 'text/plain' });
                 res.end('Method not allowed');
             }
@@ -44,7 +44,7 @@ export class HttpServerManager {
             try {
                 const data = JSON.parse(body);
                 const { file, line } = data;
-                this.outputChannel.appendLine(`[LuTeX] Received { file: ${file}, line: ${line} }`);
+                this.outputChannel.appendLine(`[HTTP Server] Received jump request { file: ${file}, line: ${line} }`);
                 
                 const lineNumber = this.parseLineNumber(line, res);
                 if (lineNumber === null) return;
@@ -55,14 +55,13 @@ export class HttpServerManager {
                     res.end('Success');
                 } else {
                     const errorMsg = 'Invalid request format. Expected JSON with file (string) and line (number > 0) properties.';
-                    this.outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+                    this.outputChannel.appendLine(`[HTTP Server] Error: ${errorMsg}`);
                     res.writeHead(400, { 'Content-Type': 'text/plain' });
                     res.end(errorMsg);
                 }
             } catch (error) {
                 const errorMsg = `Error processing HTTP data: ${error}`;
-                this.outputChannel.appendLine(`[LuTeX] ${errorMsg}`);
-                console.error(errorMsg);
+                this.outputChannel.appendLine(`[HTTP Server] ${errorMsg}`);
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('Internal server error');
             }
@@ -77,14 +76,14 @@ export class HttpServerManager {
             lineNumber = parseInt(line, 10);
             if (isNaN(lineNumber)) {
                 const errorMsg = `Invalid line number: ${line}. Must be a valid number.`;
-                this.outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+                this.outputChannel.appendLine(`[HTTP Server] Error: ${errorMsg}`);
                 res.writeHead(400, { 'Content-Type': 'text/plain' });
                 res.end(errorMsg);
                 return null;
             }
         } else {
             const errorMsg = `Invalid line type: ${typeof line}. Must be a number or string.`;
-            this.outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
+            this.outputChannel.appendLine(`[HTTP Server] Error: ${errorMsg}`);
             res.writeHead(400, { 'Content-Type': 'text/plain' });
             res.end(errorMsg);
             return null;
@@ -94,22 +93,22 @@ export class HttpServerManager {
 
     public start(port: number): void {
         this.server.listen(port, 'localhost', () => {
-            this.outputChannel.appendLine(`[LuTeX] HttpServer started on port ${port}`);
+            this.outputChannel.appendLine(`[HTTP Server] Server started on port ${port}`);
         }).on('error', (err: NodeJS.ErrnoException) => {
             if (err.code === 'EADDRINUSE') {
                 const errorMsg = `Port ${port} is already in use. Server not started.`;
-                this.outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
-                console.error(errorMsg);
+                this.outputChannel.appendLine(`[HTTP Server] Error starting server: ${errorMsg}`);
+                vscode.window.showErrorMessage(errorMsg);
             } else {
                 const errorMsg = `Error starting server: ${err}`;
-                this.outputChannel.appendLine(`[LuTeX] Error: ${errorMsg}`);
-                console.error(errorMsg);
+                this.outputChannel.appendLine(`[HTTP Server] Error starting server: ${errorMsg}`);
+                vscode.window.showErrorMessage(errorMsg);
             }
         });
     }
 
     public stop(): void {
-        this.outputChannel.appendLine('[LuTeX] Extension deactivating, closing HTTP server...');
+        this.outputChannel.appendLine('[HTTP Server] Extension deactivating, closing server...');
         this.server.close();
     }
 }
