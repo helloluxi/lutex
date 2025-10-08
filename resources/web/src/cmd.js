@@ -124,33 +124,6 @@ export default class CommandLine {
             }
         });
 
-        // Line number navigation command
-        this.commands.set('l', {
-            sugg: () => [{ command: 'l', display: 'Go to line' }],
-            exec: (args) => {
-                const lineNum = parseInt(args[0]);
-                if (!lineNum) return;
-                
-                // Find element with exact line number or closest smaller
-                let targetEl = null;
-                let closestLine = 0;
-                
-                document.querySelectorAll('[line]').forEach(el => {
-                    const elLine = parseInt(el.getAttribute('line'));
-                    if (elLine === lineNum) {
-                        targetEl = el;
-                    } else if (elLine < lineNum && elLine > closestLine) {
-                        closestLine = elLine;
-                        targetEl = el;
-                    }
-                });
-                
-                if (targetEl) {
-                    this.storeNavigationAndScroll(targetEl, 'center');
-                }
-            }
-        });
-
         // Theorem navigation command
         this.commands.set('h', {
             sugg: () => this.getTheoremSuggestions(),
@@ -404,15 +377,14 @@ export default class CommandLine {
             }
         }
 
-        // If no space-separated match, try to match commands without spaces (like ss3, fg2)
+        // If no space-separated match, try to match commands without spaces (like s3, f2)
         if (command === input && args.length === 0) {
             const patterns = [
                 { regex: /^(s)(\d+(?:\.\d+)?)$/, cmd: 's' },
                 { regex: /^(f)(\d+)$/, cmd: 'f' },
                 { regex: /^(t)(\d+)$/, cmd: 't' },
                 { regex: /^(h)(\d+)$/, cmd: 'h' },
-                { regex: /^(e)(\d+)$/, cmd: 'e' },
-                { regex: /^(l)(\d+)$/, cmd: 'l' }
+                { regex: /^(e)(\d+)$/, cmd: 'e' }
             ];
 
             for (const pattern of patterns) {

@@ -164,6 +164,45 @@ window.addEventListener('beforeunload', () => {
     localStorage.setItem('latex.scroll', window.scrollY);
 });
 
+// Scroll to element based on file and line attributes
+function scrollToElement(file, line) {
+    // Find all elements with matching file attribute
+    const allElements = document.querySelectorAll(`[file="${file}"][line]`);
+    
+    if (allElements.length === 0) {
+        console.log(`No elements found for file="${file}"`);
+        return;
+    }
+    
+    // Find the element with the closest line number that's no less than the requested one
+    let targetElement = null;
+    let closestLine = Infinity;
+    
+    allElements.forEach(element => {
+        const elementLine = parseInt(element.getAttribute('line'), 10);
+        if (elementLine >= line && elementLine < closestLine) {
+            closestLine = elementLine;
+            targetElement = element;
+        }
+    });
+    
+    if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Optional: Add a highlight effect
+        targetElement.style.transition = 'background-color 0.3s';
+        const originalBg = targetElement.style.backgroundColor;
+        targetElement.style.backgroundColor = 'var(--accent-color, rgba(255, 255, 0, 0.3))';
+        setTimeout(() => {
+            targetElement.style.backgroundColor = originalBg;
+        }, 1000);
+        
+        console.log(`Scrolled to file="${file}" line="${closestLine}" (requested: ${line})`);
+    } else {
+        console.log(`No element found for file="${file}" with line >= ${line}`);
+    }
+}
+
 // ===== INITIALIZATION =====
 // Scroll position tracking
 function setupScrollTracking() {
@@ -273,12 +312,14 @@ function setupScrollTracking() {
         });
         
         // Set up auto-refresh listener
-        const eventSource = new EventSource(`http://localhost:${listenerPort}/refresh-events`);
+        const eventSource = new EventSource(`http://localhost:${listenerPort}/event`);
         eventSource.addEventListener('message', (event) => {
             try {
                 const data = JSON.parse(event.data);
                 if (data.type === 'refresh') {
                     location.reload();
+                } else if (data.type === 'scroll') {
+                    scrollToElement(data.file, data.line);
                 }
             } catch (error) {
                 console.error('Error processing refresh event:', error);

@@ -60,6 +60,11 @@
         "command": "lutex-ext.close",
         "title": "Close (Both)",
         "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.jumpToHtml",
+        "title": "Jump to HTML Element",
+        "category": "LuTeX"
       }
     ],
     "configuration": {

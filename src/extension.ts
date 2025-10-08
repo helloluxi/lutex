@@ -232,6 +232,29 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('lutex-ext.closeListener');
     });
 
+    // Jump to HTML element based on current cursor position
+    const jumpToHtmlCommand = vscode.commands.registerCommand('lutex-ext.jumpToHtml', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            outputChannel.appendLine('[LuTeX] No active editor');
+            return;
+        }
+
+        if (!listenerServer.isRunning()) {
+            outputChannel.appendLine('[LuTeX] Listener server not running');
+            vscode.window.showWarningMessage('Listener server is not running. Please start it first.');
+            return;
+        }
+
+        const document = editor.document;
+        const position = editor.selection.active;
+        const lineNumber = position.line + 1;
+        const fileName = path.relative(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', document.fileName);
+
+        outputChannel.appendLine(`[LuTeX] Sending scroll request for ${fileName}:${lineNumber}`);
+        listenerServer.notifyScroll(fileName, lineNumber);
+    });
+
     // Status bar toggle command
     const toggleStatusCommand = vscode.commands.registerCommand('lutex-ext.toggleStatus', async () => {
         const options: string[] = [];
@@ -284,6 +307,7 @@ export function activate(context: vscode.ExtensionContext) {
         closeListenerCommand,
         launchCommand,
         closeCommand,
+        jumpToHtmlCommand,
         toggleStatusCommand,
         statusBar
     );

@@ -27,7 +27,7 @@ export class ListenerServer {
 
             if (req.method === 'POST') {
                 this.handlePostRequest(req, res);
-            } else if (req.method === 'GET' && req.url === '/refresh-events') {
+            } else if (req.method === 'GET' && req.url === '/event') {
                 this.handleRefreshEventStream(req, res);
             } else {
                 this.outputChannel.appendLine(`[Listener Server] Method not allowed: ${req.method}`);
@@ -95,6 +95,18 @@ export class ListenerServer {
         this.connectedClients.forEach(client => {
             try {
                 client.write('data: {"type":"refresh"}\n\n');
+            } catch (error) {
+                // Silently remove failed clients
+                this.connectedClients.delete(client);
+            }
+        });
+    }
+
+    public notifyScroll(file: string, line: number): void {
+        const message = JSON.stringify({ type: 'scroll', file, line });
+        this.connectedClients.forEach(client => {
+            try {
+                client.write(`data: ${message}\n\n`);
             } catch (error) {
                 // Silently remove failed clients
                 this.connectedClients.delete(client);
