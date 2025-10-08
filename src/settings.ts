@@ -10,6 +10,11 @@ export function getListenerPortFromSettings(): number {
     return config.get<number>('listenerPort') ?? 0;
 }
 
+export function getThemeFromSettings(): string {
+    const config = vscode.workspace.getConfiguration('lutex-ext');
+    return config.get<string>('theme') ?? 'dark';
+}
+
 // Backward compatibility
 export function getPortFromSettings(): number | undefined {
     const config = vscode.workspace.getConfiguration('lutex-ext');

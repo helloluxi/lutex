@@ -10,6 +10,9 @@
   "categories": [
     "Other"
   ],
+  "activationEvents": [
+    "onLanguage:latex"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -65,7 +68,7 @@
         "lutex-ext.rendererPort": {
           "type": "number",
           "default": 0,
-          "description": "Port number for the LaTeX renderer server (0 = auto-detect)",
+          "description": "Port number for the LuTeX renderer server (0 = auto-detect)",
           "minimum": 0,
           "maximum": 65535
         },
@@ -75,6 +78,12 @@
           "description": "Port number for the line jumping listener server (0 = auto-detect)",
           "minimum": 0,
           "maximum": 65535
+        },
+        "lutex-ext.theme": {
+          "type": "string",
+          "enum": ["light", "dark"],
+          "default": "dark",
+          "description": "Default theme for the LuTeX renderer"
         }
       }
     }

@@ -95,13 +95,15 @@ export class RendererServer {
         let filePath: string;
         
         if (pathname === '/' || pathname === '/index.html') {
-            // Serve the main HTML file with potential modifications for listener port
+            // Serve the main HTML file with potential modifications for listener port and theme
             filePath = path.join(this.resourcesPath, 'index.html');
             
-            // If listener parameter is provided, modify the HTML to include it
-            const listenerPort = url.searchParams.get('listener');
-            if (listenerPort) {
-                this.serveModifiedIndexHtml(filePath, listenerPort, res);
+            // Get URL parameters (using 'o' for port and 'm' for theme mode)
+            const listenerPort = url.searchParams.get('o');
+            const themeMode = url.searchParams.get('m');
+            
+            if (listenerPort || themeMode) {
+                this.serveModifiedIndexHtml(filePath, listenerPort, themeMode, res);
                 return;
             }
         } else if (pathname.startsWith('/src/')) {
@@ -162,7 +164,7 @@ export class RendererServer {
         });
     }
 
-    private serveModifiedIndexHtml(filePath: string, listenerPort: string, res: http.ServerResponse): void {
+    private serveModifiedIndexHtml(filePath: string, listenerPort: string | null, themeMode: string | null, res: http.ServerResponse): void {
         fs.readFile(filePath, 'utf8', (err, data) => {
             if (err) {
                 this.outputChannel.appendLine(`[Renderer Server] Error reading file ${filePath}: ${err.message}`);
@@ -171,14 +173,25 @@ export class RendererServer {
                 return;
             }
 
-            // Inject listener port as a global variable in the HTML
+            // Build configuration script
+            let configScript = '<script>\n';
+            
+            if (listenerPort) {
+                configScript += `        // Listener port configuration\n`;
+                configScript += `        window.lutexListenerPort = ${parseInt(listenerPort)};\n`;
+            }
+            
+            if (themeMode) {
+                configScript += `        // Theme mode configuration\n`;
+                configScript += `        window.lutexDefaultTheme = '${themeMode}';\n`;
+            }
+            
+            configScript += '    </script>\n    <script>';
+
+            // Inject configuration as a global variable in the HTML
             const modifiedHtml = data.replace(
                 /<script>/,
-                `<script>
-        // Listener port configuration
-        window.lutexListenerPort = ${parseInt(listenerPort)};
-    </script>
-    <script>`
+                configScript
             );
 
             res.writeHead(200, { 'Content-Type': 'text/html' });

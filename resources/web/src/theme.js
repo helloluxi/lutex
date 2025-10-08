@@ -5,9 +5,17 @@ export default class ThemeManager {
   }
 
   initialize() {
-    // Get saved theme from localStorage or default to dark
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    this.setTheme(savedTheme);
+    // Get saved theme from localStorage, or use default theme from settings (one-time), or default to dark
+    const savedTheme = localStorage.getItem('theme');
+    
+    if (!savedTheme && window.lutexDefaultTheme) {
+      // One-time use of default theme from URL parameter
+      this.setTheme(window.lutexDefaultTheme);
+      // Clean up the parameter after use
+      delete window.lutexDefaultTheme;
+    } else {
+      this.setTheme(savedTheme || 'dark');
+    }
   }
 
   setTheme(theme) {

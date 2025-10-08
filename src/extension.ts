@@ -4,7 +4,7 @@ import { registerFileCommands } from './fileCommands';
 import { registerBibtexCommands } from './bibtexCommands';
 import { ListenerServer } from './listenerServer';
 import { RendererServer } from './rendererServer';
-import { getRendererPortFromSettings, getListenerPortFromSettings } from './settings';
+import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
 
@@ -54,11 +54,21 @@ export function activate(context: vscode.ExtensionContext) {
                 const port = rendererServer.getPort();
                 outputChannel.appendLine(`[LuTeX] Renderer already running on port ${port}, opening browser`);
                 
-                // Check if listener is running to include listener port parameter
+                // Build URL with parameters
                 let url = `http://localhost:${port}`;
+                const params = new URLSearchParams();
+                
                 if (listenerServer.isRunning()) {
                     const listenerPort = listenerServer.getPort();
-                    url += `?listener=${listenerPort}`;
+                    params.append('o', listenerPort!.toString());
+                }
+                
+                const theme = getThemeFromSettings();
+                params.append('m', theme);
+                
+                const queryString = params.toString();
+                if (queryString) {
+                    url += `?${queryString}`;
                 }
                 
                 vscode.env.openExternal(vscode.Uri.parse(url));
@@ -73,11 +83,21 @@ export function activate(context: vscode.ExtensionContext) {
             
             statusBar.setRendererStatus(true, serverPort);
             
-            // Build URL with listener port if available
+            // Build URL with parameters
             let url = `http://localhost:${serverPort}`;
+            const params = new URLSearchParams();
+            
             if (listenerServer.isRunning()) {
                 const listenerPort = listenerServer.getPort();
-                url += `?listener=${listenerPort}`;
+                params.append('o', listenerPort!.toString());
+            }
+            
+            const theme = getThemeFromSettings();
+            params.append('m', theme);
+            
+            const queryString = params.toString();
+            if (queryString) {
+                url += `?${queryString}`;
             }
             
             // Automatically open browser
@@ -157,24 +177,45 @@ export function activate(context: vscode.ExtensionContext) {
                 const rendererServerPort = await rendererServer.start(rendererPort);
                 statusBar.setRendererStatus(true, rendererServerPort);
 
-                // Build URL with listener port
+                // Build URL with parameters
                 let url = `http://localhost:${rendererServerPort}`;
+                const params = new URLSearchParams();
+                
                 if (listenerServer.isRunning()) {
                     const listenerPort = listenerServer.getPort();
-                    url += `?listener=${listenerPort}`;
+                    params.append('o', listenerPort!.toString());
+                }
+                
+                const theme = getThemeFromSettings();
+                params.append('m', theme);
+                
+                const queryString = params.toString();
+                if (queryString) {
+                    url += `?${queryString}`;
                 }
 
                 // Automatically open browser
                 vscode.env.openExternal(vscode.Uri.parse(url));
                 outputChannel.appendLine(`[LuTeX] Both services started - renderer: ${rendererServerPort}, listener: ${listenerServer.getPort()}, opened in browser`);
             } else {
-                // If renderer is already running, just ensure browser opens with listener param
+                // If renderer is already running, just ensure browser opens with parameters
                 const rendererPort = rendererServer.getPort();
                 let url = `http://localhost:${rendererPort}`;
+                const params = new URLSearchParams();
+                
                 if (listenerServer.isRunning()) {
                     const listenerPort = listenerServer.getPort();
-                    url += `?listener=${listenerPort}`;
+                    params.append('o', listenerPort!.toString());
                 }
+                
+                const theme = getThemeFromSettings();
+                params.append('m', theme);
+                
+                const queryString = params.toString();
+                if (queryString) {
+                    url += `?${queryString}`;
+                }
+                
                 vscode.env.openExternal(vscode.Uri.parse(url));
                 outputChannel.appendLine(`[LuTeX] Renderer already running, opened with listener integration`);
             }
