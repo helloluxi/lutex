@@ -309,11 +309,78 @@ class LutexCore {
             this.numberToRoman(num);
     }
 
+    // Helper function to parse a single subfloat
+    parseSubfloat(subfloatMatch, figureIdx, subfloatIndex) {
+        const subfloatParts = subfloatMatch.match(/\\subfloat\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/);
+        if (!subfloatParts) return null;
+        
+        const subfloatCaption = subfloatParts[1] || '';
+        let subfloatContent = subfloatParts[2];
+        
+        // Parse graphics in subfloat content
+        const graphicsMatch = subfloatContent.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/);
+        const graphicsPath = graphicsMatch ? graphicsMatch[2].trim() : '';
+        
+        // Parse subfloat label (inside the subfloat)
+        const subfloatLabelMatch = subfloatContent.match(/\\label\{([^}]+)\}/);
+        const subfloatLabel = subfloatLabelMatch ? subfloatLabelMatch[1] : '';
+        
+        // Register subfloat label in autorefMap with format "Fig.3a", "Fig.3b", etc.
+        if (subfloatLabel) {
+            const subfigLetter = String.fromCharCode(97 + subfloatIndex); // a, b, c, ...
+            this.autorefMap.set(subfloatLabel, { 
+                type: 'fig', 
+                text: `Fig.&nbsp;${figureIdx}${subfigLetter}`, 
+                number: figureIdx,
+                subfigIndex: subfigLetter
+            });
+        }
+        
+        return {
+            label: subfloatLabel,
+            caption: subfloatCaption,
+            graphicsPath: graphicsPath,
+            letter: String.fromCharCode(97 + subfloatIndex)
+        };
+    }
+
     // Parse figure environment
     renderFig(content) {
         const figureIdx = this.figureLabels.length + 1;
         
-        // Parse label
+        // First, check for and parse subfloat structures
+        const subfloatMatches = content.match(/\\subfloat\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g);
+        
+        let figureContent = '';
+        
+        if (subfloatMatches && subfloatMatches.length > 0) {
+            // Handle subfloat structure
+            figureContent = '<div class="subfloats-container">';
+            
+            subfloatMatches.forEach((subfloatMatch, index) => {
+                const subfloatData = this.parseSubfloat(subfloatMatch, figureIdx, index);
+                if (subfloatData) {
+                    figureContent += `
+                        <div class="subfloat" ${subfloatData.label ? `id="${subfloatData.label.replace(':', '-')}" data-label="${subfloatData.label}"` : ''}>
+                            <div class="figure-placeholder">${subfloatData.graphicsPath}</div>
+                            ${subfloatData.caption ? `<div class="subfloat-caption">(${subfloatData.letter}) ${subfloatData.caption}</div>` : ''}
+                        </div>`;
+                }
+            });
+            
+            figureContent += '</div>';
+            
+            // Remove subfloat blocks from content so we can parse the main figure label
+            content = content.replace(/\\subfloat\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, '');
+        } else {
+            // Handle single figure structure
+            const graphicsMatch = content.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/s);
+            const graphicsPath = graphicsMatch ? graphicsMatch[2].trim() : '';
+            
+            figureContent = `<div class="figure-placeholder">${graphicsPath}</div>`;
+        }
+
+        // Now parse the main figure label (outside subfloats)
         let label = `fig:${figureIdx}`;
         content = content.replace(/\\label\{([^}]+)\}/, (match, labelMatch) => {
             label = labelMatch;
@@ -340,50 +407,9 @@ class LutexCore {
             content = content.replace(captionMatch.fullMatch, '');
         }
 
-        // Check if this is a subfloat structure
-        const subfloatMatches = content.match(/\\subfloat\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g);
-        
-        let figureContent = '';
-        
-        if (subfloatMatches && subfloatMatches.length > 0) {
-            // Handle subfloat structure
-            figureContent = '<div class="subfloats-container">';
-            
-            subfloatMatches.forEach((subfloatMatch, index) => {
-                const subfloatParts = subfloatMatch.match(/\\subfloat\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/);
-                if (subfloatParts) {
-                    const subfloatCaption = subfloatParts[1] || '';
-                    const subfloatContent = subfloatParts[2];
-                    
-                    // Parse graphics in subfloat content
-                    const graphicsMatch = subfloatContent.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/);
-                    const graphicsPath = graphicsMatch ? graphicsMatch[2].trim() : '';
-                    
-                    // Parse subfloat label
-                    const subfloatLabelMatch = subfloatContent.match(/\\label\{([^}]+)\}/);
-                    const subfloatLabel = subfloatLabelMatch ? subfloatLabelMatch[1] : '';
-                    
-                    figureContent += `
-                        <div class="subfloat" ${subfloatLabel ? `id="${subfloatLabel.replace(':', '-')}" data-label="${subfloatLabel}"` : ''}>
-                            <div class="figure-placeholder">${graphicsPath}</div>
-                            ${subfloatCaption ? `<div class="subfloat-caption">(${String.fromCharCode(97 + index)}) ${subfloatCaption}</div>` : ''}
-                        </div>`;
-                }
-            });
-            
-            figureContent += '</div>';
-        } else {
-            // Handle single figure structure
-            const graphicsMatch = content.match(/\\includegraphics(?:\[width=([0-9.]*)\\textwidth\])?\s*\{([^}]+)\}/s);
-            const graphicsPath = graphicsMatch ? graphicsMatch[2].trim() : '';
-            
-            figureContent = `<div class="figure-placeholder">${graphicsPath}</div>`;
-        }
-
-        // Remove parsed elements from content
+        // Remove remaining parsed elements from content
         content = content.replace(/\\includegraphics(?:\[[^\]]*\])?\s*\{[^}]+\}/sg, '');
         content = content.replace(/\\centering/g, '');
-        content = content.replace(/\\subfloat\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, '');
 
         return `<div class="figure" id="fig-${figureIdx}" data-label="${label}" ${this.meta()}>
                 ${figureContent}

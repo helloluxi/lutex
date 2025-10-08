@@ -161,7 +161,7 @@ async function render() {
 // ===== SCROLL POSITION MANAGEMENT =====
 // Save position before unloading the page
 window.addEventListener('beforeunload', () => {
-    localStorage.setItem('latex.scroll', window.scrollY);
+    localStorage.setItem('scroll', window.scrollY);
 });
 
 // Scroll to element based on file and line attributes
@@ -208,7 +208,7 @@ function scrollToElement(file, line) {
 function setupScrollTracking() {
     // Add a small delay to ensure all content is fully rendered
     setTimeout(() => {
-        const savedPosition = localStorage.getItem('latex.scroll');
+        const savedPosition = localStorage.getItem('scroll');
         if (savedPosition !== null) {
             window.scrollTo(0, parseInt(savedPosition, 10));
         }
@@ -219,8 +219,8 @@ function setupScrollTracking() {
 
     // Helper functions for navigation history
     function storeNavigationPair(fromPosition, toPosition) {
-        localStorage.setItem('latex.naviback', fromPosition);
-        localStorage.setItem('latex.naviforth', toPosition);
+        localStorage.setItem('naviback', fromPosition);
+        localStorage.setItem('naviforth', toPosition);
     }
 
     // Make navigation history function globally available
@@ -231,7 +231,7 @@ function setupScrollTracking() {
     };
 
     function navigateToStoredPosition(direction) {
-        const key = direction === 1 ? 'latex.naviforth' : 'latex.naviback';
+        const key = direction === 1 ? 'naviforth' : 'naviback';
         const targetPosition = localStorage.getItem(key);
         
         if (targetPosition !== null) {
@@ -244,7 +244,7 @@ function setupScrollTracking() {
             });
 
             // Save the new position
-            localStorage.setItem('latex.scroll', position);
+            localStorage.setItem('scroll', position);
             
             setTimeout(() => { isNavigating = false; }, 1000);
         }
@@ -257,7 +257,7 @@ function setupScrollTracking() {
 
         clearTimeout(scrollTimer);
         scrollTimer = setTimeout(() => {
-            localStorage.setItem('latex.scroll', window.scrollY);
+            localStorage.setItem('scroll', window.scrollY);
         }, 1000);
     });
 
@@ -429,8 +429,8 @@ function setupAutorefNavigation() {
                     // Store navigation history
                     const fromPosition = window.scrollY;
                     const toPosition = targetElement.offsetTop;
-                    localStorage.setItem('latex.naviback', fromPosition);
-                    localStorage.setItem('latex.naviforth', toPosition);
+                    localStorage.setItem('naviback', fromPosition);
+                    localStorage.setItem('naviforth', toPosition);
                     
                     // Navigate to target
                     targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
