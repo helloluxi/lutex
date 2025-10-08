@@ -1,7 +1,7 @@
 import * as http from 'http';
 import * as vscode from 'vscode';
 import { jumpToLine } from './fileNavigation';
-import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse, PORT_RANGES } from './tools';
+import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse } from './tools';
 
 export class ListenerServer {
     private server: http.Server;
@@ -70,8 +70,8 @@ export class ListenerServer {
 
 
     public async start(port?: number): Promise<number> {
-        try {
-            const actualPort = port || await findAvailablePort(PORT_RANGES.LISTENER.start, PORT_RANGES.LISTENER.max);
+        const tryStart = async (): Promise<number> => {
+            const actualPort = port || await findAvailablePort();
             
             return new Promise((resolve, reject) => {
                 this.server.listen(actualPort, 'localhost', () => {
@@ -79,21 +79,26 @@ export class ListenerServer {
                     this.outputChannel.appendLine(`[Listener Server] Listener started on port ${actualPort}`);
                     resolve(actualPort);
                 }).on('error', (err: NodeJS.ErrnoException) => {
-                    if (err.code === 'EADDRINUSE') {
-                        const errorMsg = `Port ${actualPort} is already in use. Server not started.`;
-                        this.outputChannel.appendLine(`[Listener Server] Error starting server: ${errorMsg}`);
-                        reject(new Error(errorMsg));
-                    } else {
-                        const errorMsg = `Error starting server: ${err}`;
-                        this.outputChannel.appendLine(`[Listener Server] Error starting server: ${errorMsg}`);
-                        reject(new Error(errorMsg));
-                    }
+                    this.outputChannel.appendLine(`[Listener Server] Error starting server on port ${actualPort}: ${err.message}`);
+                    reject(err);
                 });
             });
-        } catch (error) {
-            const errorMsg = `Failed to find available port: ${error}`;
-            this.outputChannel.appendLine(`[Listener Server] ${errorMsg}`);
-            throw error;
+        };
+
+        // Keep retrying until successful
+        while (true) {
+            try {
+                return await tryStart();
+            } catch (error) {
+                // If a specific port was requested and failed, throw the error
+                if (port) {
+                    const errorMsg = `Failed to start server on port ${port}: ${error}`;
+                    this.outputChannel.appendLine(`[Listener Server] ${errorMsg}`);
+                    throw new Error(errorMsg);
+                }
+                // Otherwise, retry with a new random port
+                this.outputChannel.appendLine('[Listener Server] Retrying with a new port...');
+            }
         }
     }
 

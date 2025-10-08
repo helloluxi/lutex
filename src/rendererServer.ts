@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { jumpToLine } from './fileNavigation';
-import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse, PORT_RANGES } from './tools';
+import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse } from './tools';
 
 export class RendererServer {
     private server: http.Server;
@@ -187,24 +187,36 @@ export class RendererServer {
     }
 
     public async start(port?: number): Promise<number> {
-        try {
-            this.port = port || await findAvailablePort(PORT_RANGES.RENDERER.start, PORT_RANGES.RENDERER.max);
+        const tryStart = async (): Promise<number> => {
+            const actualPort = port || await findAvailablePort();
             
             return new Promise((resolve, reject) => {
-                this.server.listen(this.port!, 'localhost', () => {
+                this.server.listen(actualPort, 'localhost', () => {
+                    this.port = actualPort;
                     this.outputChannel.appendLine(`[Renderer Server] LaTeX renderer server started on port ${this.port}`);
                     this.outputChannel.appendLine(`[Renderer Server] Access at: http://localhost:${this.port}`);
                     resolve(this.port!);
                 }).on('error', (err: NodeJS.ErrnoException) => {
-                    const errorMsg = `Error starting server: ${err.message}`;
-                    this.outputChannel.appendLine(`[Renderer Server] ${errorMsg}`);
+                    this.outputChannel.appendLine(`[Renderer Server] Error starting server on port ${actualPort}: ${err.message}`);
                     reject(err);
                 });
             });
-        } catch (error) {
-            const errorMsg = `Failed to find available port: ${error}`;
-            this.outputChannel.appendLine(`[Renderer Server] ${errorMsg}`);
-            throw error;
+        };
+
+        // Keep retrying until successful
+        while (true) {
+            try {
+                return await tryStart();
+            } catch (error) {
+                // If a specific port was requested and failed, throw the error
+                if (port) {
+                    const errorMsg = `Failed to start server on port ${port}: ${error}`;
+                    this.outputChannel.appendLine(`[Renderer Server] ${errorMsg}`);
+                    throw new Error(errorMsg);
+                }
+                // Otherwise, retry with a new random port
+                this.outputChannel.appendLine('[Renderer Server] Retrying with a new port...');
+            }
         }
     }
 

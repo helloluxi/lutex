@@ -6,33 +6,23 @@ import * as vscode from 'vscode';
  */
 
 /**
- * Find an available port within a given range
- * @param startPort - The starting port to search from
- * @param maxPort - The maximum port to search up to
+ * Find an available random port between 1024 and 65535
  * @returns Promise<number> - The available port
  */
-export function findAvailablePort(startPort: number, maxPort: number): Promise<number> {
-    return new Promise((resolve, reject) => {
-        let port = startPort;
-        
+export function findAvailablePort(): Promise<number> {
+    return new Promise((resolve) => {
         const tryPort = () => {
+            // Generate a random port between 1024 and 65535
+            const port = Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024;
             const testServer = http.createServer();
             
             testServer.listen(port, 'localhost', () => {
                 testServer.close(() => {
                     resolve(port);
                 });
-            }).on('error', (err: NodeJS.ErrnoException) => {
-                if (err.code === 'EADDRINUSE') {
-                    port++;
-                    if (port > maxPort) {
-                        reject(new Error(`No available port found between ${startPort} and ${maxPort}`));
-                        return;
-                    }
-                    tryPort();
-                } else {
-                    reject(err);
-                }
+            }).on('error', () => {
+                // On any error, try again with a new random port
+                tryPort();
             });
         };
         
@@ -135,10 +125,3 @@ export function sendErrorResponse(
     res.end(message);
 }
 
-/**
- * Port range configurations
- */
-export const PORT_RANGES = {
-    RENDERER: { start: 4300, max: 4400 },
-    LISTENER: { start: 4000, max: 4100 }
-} as const;
