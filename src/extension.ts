@@ -26,6 +26,25 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize status bar
     const statusBar = new StatusBarManager();
 
+    // Set up file watcher for .tex files to trigger refresh
+    const texFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.tex');
+    texFileWatcher.onDidChange(() => {
+        if (listenerServer.isRunning()) {
+            listenerServer.notifyRefresh();
+        }
+    });
+    texFileWatcher.onDidCreate(() => {
+        if (listenerServer.isRunning()) {
+            listenerServer.notifyRefresh();
+        }
+    });
+    texFileWatcher.onDidDelete(() => {
+        if (listenerServer.isRunning()) {
+            listenerServer.notifyRefresh();
+        }
+    });
+    context.subscriptions.push(texFileWatcher);
+
     // Register commands
     
     // Launch Renderer

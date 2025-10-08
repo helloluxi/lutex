@@ -7,6 +7,7 @@ export class ListenerServer {
     private server: http.Server;
     private outputChannel: vscode.OutputChannel;
     private port: number | null = null;
+    private connectedClients: Set<http.ServerResponse> = new Set();
 
     constructor(outputChannel: vscode.OutputChannel) {
         this.outputChannel = outputChannel;
@@ -16,7 +17,7 @@ export class ListenerServer {
     private createServer(): http.Server {
         return http.createServer((req, res) => {
             // Add CORS headers
-            addCorsHeaders(res, 'POST, OPTIONS');
+            addCorsHeaders(res, 'POST, GET, OPTIONS');
 
             // Handle preflight requests
             if (req.method === 'OPTIONS') {
@@ -26,6 +27,8 @@ export class ListenerServer {
 
             if (req.method === 'POST') {
                 this.handlePostRequest(req, res);
+            } else if (req.method === 'GET' && req.url === '/refresh-events') {
+                this.handleRefreshEventStream(req, res);
             } else {
                 this.outputChannel.appendLine(`[Listener Server] Method not allowed: ${req.method}`);
                 res.writeHead(405, { 'Content-Type': 'text/plain' });
@@ -63,6 +66,38 @@ export class ListenerServer {
                 this.outputChannel.appendLine(`[Listener Server] ${errorMsg}`);
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('Internal server error');
+            }
+        });
+    }
+
+    private handleRefreshEventStream(req: http.IncomingMessage, res: http.ServerResponse): void {
+        // Set up Server-Sent Events (SSE)
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*'
+        });
+
+        // Add this client to the set of connected clients
+        this.connectedClients.add(res);
+
+        // Send initial connection message
+        res.write('data: {"type":"connected"}\n\n');
+
+        // Handle client disconnect
+        req.on('close', () => {
+            this.connectedClients.delete(res);
+        });
+    }
+
+    public notifyRefresh(): void {
+        this.connectedClients.forEach(client => {
+            try {
+                client.write('data: {"type":"refresh"}\n\n');
+            } catch (error) {
+                // Silently remove failed clients
+                this.connectedClients.delete(client);
             }
         });
     }

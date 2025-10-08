@@ -271,6 +271,20 @@ function setupScrollTracking() {
                 }).catch(error => console.error('Error sending line number:', error));
             }
         });
+        
+        // Set up auto-refresh listener
+        const eventSource = new EventSource(`http://localhost:${listenerPort}/refresh-events`);
+        eventSource.addEventListener('message', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'refresh') {
+                    location.reload();
+                }
+            } catch (error) {
+                console.error('Error processing refresh event:', error);
+            }
+        });
+        
         console.log(`Localhost integration enabled on port ${listenerPort}`);
     }
 }
