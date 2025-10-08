@@ -37,10 +37,7 @@ class LutexCore {
     async render(texPath) {
         this.texPath = texPath;
         this.lineNum = 0;
-        this.env = '';
-        this.envContent = [];
-        this.paraHtml = [];
-
+        const startIdx = this.paraHtml.length;
         const rawContent = await fetch(texPath).then(response => response.text());
         let emptyLineCount = 0, hiddenEnv = '';
         for (let line of rawContent.split('\n')) {
@@ -159,6 +156,10 @@ class LutexCore {
                                 this.renderFig(this.envContent.join(' ')) :
                             this.env.startsWith('table') ?
                                 this.renderTab(this.envContent.join(' ')) :
+                            this.env === 'itemize' ?
+                                this.renderList(this.envContent.join(' '), false) :
+                            this.env === 'enumerate' ?
+                                this.renderList(this.envContent.join(' '), true) :
                             `<div class="todo">${this.envContent.join(' ')}</div>`
                         );
                         this.envContent.length = 0;
@@ -175,7 +176,11 @@ class LutexCore {
             }
         }
 
-        let result = this.paraHtml.join('').replace(
+        // Extract only the newly generated HTML (from startIdx onwards)
+        const newHtml = this.paraHtml.slice(startIdx);
+        
+        // Process text replacements on the new content only (but NOT autoref yet)
+        let result = newHtml.join('').replace(
             /\\todo\{([^}]*)}/g, (match, content) => {
                 return `<span class="todo">(TODO: ${content.trim()})</span>`;
             }).replace(
@@ -204,11 +209,28 @@ class LutexCore {
                 /\\qed/g, () => {
                     return `</div></div>`;
                 }
+            ).replace(
+                /\\ip\{([^}]+)\}(?!\{)/g, (match, arg1) => {
+                    return `\\ip{${arg1}}{${arg1}}`;
+                }
+            ).replace(
+                /\\dyad\{([^}]+)\}(?!\{)/g, (match, arg1) => {
+                    return `\\dyad{${arg1}}{${arg1}}`;
+                }
+            ).replace(
+                /\\ev\{([^}]+)\}\{([^}]+)\}/g, (match, arg1, arg2) => {
+                    return `\\mel{${arg2}}{${arg1}}{${arg2}}`;
+                }
             );
 
-        // Process autoref replacements at the very end
-        result = result.replace(
-            /\\autoref\{([^}]+)\}/g, (match, labelKey) => {
+        // NOTE: autoref replacement is deferred to second pass
+        return result;
+    }
+
+    // Second pass: process all autoref replacements after all files are rendered
+    processAutorefs(html) {
+        return html.replace(
+            /\\(auto|app)ref\{([^}]+)\}/g, (match, _, labelKey) => {
                 if (!labelKey || !this.autorefMap.has(labelKey)) {
                     return `<span class="todo">${match}</span>`;
                 }
@@ -226,8 +248,6 @@ class LutexCore {
                 return `<a href="#${refId}" class="autoref">${refText}</a>`;
             }
         );
-
-        return result;
     }
 
     meta() {
@@ -499,6 +519,16 @@ class LutexCore {
         }
         return `<div class="equation" id="eq-${eqIdx}" data-label="${label}" ${this.meta()}>\\begin{${env}}${content}\\end{${env}}</div>`;
     }
+
+    // Parse list environment (itemize/enumerate)
+    renderList(content, numbered) {
+        const items = content.split(/\\item\s+/)
+            .filter(item => item.trim())
+            .map(item => `<li>${item.trim()}</li>`)
+            .join('\n');
+        const tag = numbered ? 'ol' : 'ul';
+        return `<${tag} ${this.meta()}>${items}</${tag}>`;
+    }
 }
 
 export default class LutexArticle {
@@ -575,12 +605,6 @@ export default class LutexArticle {
             this.affiliationHtml = '<div class="affiliation">' + affiliationMatch[1].trim().replace(/\\\\/g, '') + '</div>';
         }
 
-        // Parse \input{<this.bodyFile>}
-        const inputMatch = mainContent.match(/\\input\{(.+?)\}/);
-        if (inputMatch) {
-            this.bodyFile = inputMatch[1].trim();
-        }
-
         // Parse \bibliography{<this.bibFiles>}
         const bibMatch = mainContent.match(/\\bibliography\{(.+?)\}/);
         if (bibMatch) {
@@ -622,9 +646,33 @@ export default class LutexArticle {
         }
         html += `<div class="abstract">${this.abstractHtml}</div>`;
 
-        // Body content
+        // Body content - Two-pass rendering for multiple \input commands
         this.core = new LutexCore();
-        html += await this.core.render(this.bodyFile);
+        
+        // FIRST PASS: Render all files and collect labels
+        // Process the main content line by line to handle \input and \appendix
+        const lines = mainContent.split('\n');
+        for (let line of lines) {
+            line = line.trim();
+            
+            // Handle \appendix command in main file
+            if (line.startsWith('\\appendix')) {
+                this.core.isAppx = true;
+                this.core.numSecBeforeAppx = this.core.secIdx;
+            }
+            // Handle \input{filename} command
+            else if (line.match(/^\\input\{(.+?)\}/)) {
+                const inputMatch = line.match(/^\\input\{(.+?)\}/);
+                if (inputMatch) {
+                    const inputFile = this.tryAddExtension(inputMatch[1].trim(), '.tex');
+                    // Render with line number reset for each new file
+                    html += await this.core.render(inputFile);
+                }
+            }
+        }
+        
+        // SECOND PASS: Process all autoref replacements now that all labels are collected
+        html = this.core.processAutorefs(html);
 
         // // References
         // if (this.bibliography.length > 0) {

@@ -33,16 +33,6 @@ export function activate(context: vscode.ExtensionContext) {
             listenerServer.notifyRefresh();
         }
     });
-    texFileWatcher.onDidCreate(() => {
-        if (listenerServer.isRunning()) {
-            listenerServer.notifyRefresh();
-        }
-    });
-    texFileWatcher.onDidDelete(() => {
-        if (listenerServer.isRunning()) {
-            listenerServer.notifyRefresh();
-        }
-    });
     context.subscriptions.push(texFileWatcher);
 
     // Register commands

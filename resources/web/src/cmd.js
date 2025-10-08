@@ -426,18 +426,20 @@ export default class CommandLine {
         
         // Add sections
         navigationData.sections.forEach(section => {
+            const displayText = section.label ? `${section.display} {${section.label}}` : section.display;
             suggestions.push({
                 command: section.command,
-                display: section.display,
+                display: displayText,
                 element: document.getElementById(section.id)
             });
         });
         
         // Add subsections
         navigationData.subsections.forEach(subsection => {
+            const displayText = subsection.label ? `${subsection.display} {${subsection.label}}` : subsection.display;
             suggestions.push({
                 command: subsection.command,
-                display: subsection.display,
+                display: displayText,
                 element: document.getElementById(subsection.id)
             });
         });
@@ -458,11 +460,14 @@ export default class CommandLine {
 
     getFigureSuggestions() {
         const navigationData = this.lutexArticle?.getNavigationData() || { figures: [] };
-        return navigationData.figures.map(figure => ({
-            command: figure.command,
-            display: figure.display,
-            element: document.getElementById(figure.id)
-        })).sort((a, b) => {
+        return navigationData.figures.map(figure => {
+            const displayText = figure.label ? `${figure.display} {${figure.label}}` : figure.display;
+            return {
+                command: figure.command,
+                display: displayText,
+                element: document.getElementById(figure.id)
+            };
+        }).sort((a, b) => {
             const aNum = parseInt(a.command.replace('f ', ''));
             const bNum = parseInt(b.command.replace('f ', ''));
             return aNum - bNum;
@@ -484,11 +489,14 @@ export default class CommandLine {
 
     getTableSuggestions() {
         const navigationData = this.lutexArticle?.getNavigationData() || { tables: [] };
-        return navigationData.tables.map(table => ({
-            command: table.command,
-            display: table.display,
-            element: document.getElementById(table.id)
-        })).sort((a, b) => {
+        return navigationData.tables.map(table => {
+            const displayText = table.label ? `${table.display} {${table.label}}` : table.display;
+            return {
+                command: table.command,
+                display: displayText,
+                element: document.getElementById(table.id)
+            };
+        }).sort((a, b) => {
             const aNum = parseInt(a.command.replace('t ', ''));
             const bNum = parseInt(b.command.replace('t ', ''));
             return aNum - bNum;
@@ -497,11 +505,14 @@ export default class CommandLine {
 
     getTheoremSuggestions() {
         const navigationData = this.lutexArticle?.getNavigationData() || { theorems: [] };
-        return navigationData.theorems.map(theorem => ({
-            command: theorem.command,
-            display: theorem.display,
-            element: document.getElementById(theorem.id)
-        }));
+        return navigationData.theorems.map(theorem => {
+            const displayText = theorem.label ? `${theorem.display} {${theorem.label}}` : theorem.display;
+            return {
+                command: theorem.command,
+                display: displayText,
+                element: document.getElementById(theorem.id)
+            };
+        });
     }
 
     showSuggestions(suggestions) {
