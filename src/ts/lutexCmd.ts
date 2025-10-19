@@ -1,5 +1,19 @@
+// @ts-nocheck
+import LutexArticle from './lutexRenderer.js';
+
 export default class CommandLine {
-    constructor(lutexArticle = null) {
+    isVisible: boolean;
+    commands: Map<string, any>;
+    lutexArticle: LutexArticle | null;
+    suggestions: any[];
+    selectedSuggestion: number;
+    commandBar?: HTMLElement;
+    input?: HTMLInputElement;
+    suggestionsEl?: HTMLElement;
+    commandInput?: HTMLInputElement;
+    suggestionsContainer?: HTMLElement;
+
+    constructor(lutexArticle: LutexArticle | null = null) {
         this.isVisible = false;
         this.commands = new Map();
         this.lutexArticle = lutexArticle;
@@ -16,6 +30,10 @@ export default class CommandLine {
             exec: () => {
                 if (window.themeManager) {
                     window.themeManager.toggle();
+                    // Update URL parameter to match new theme
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('m', window.themeManager.getCurrentTheme());
+                    window.history.replaceState({}, '', url);
                 }
             },
             sugg: () => [{ command: 'm', display: 'Toggle theme (dark/light)' }]
@@ -170,13 +188,13 @@ export default class CommandLine {
     }
 
     createCommandBar() {
-        this.commandBar = document.getElementById('command-bar');
-        this.input = document.getElementById('command-input');
-        this.suggestionsEl = document.getElementById('command-suggestions');
+        this.commandBar = document.getElementById('command-bar') || undefined;
+        this.input = document.getElementById('command-input') as HTMLInputElement || undefined;
+        this.suggestionsEl = document.getElementById('command-suggestions') || undefined;
     }
 
     // Helper method to store navigation history and scroll
-    storeNavigationAndScroll(element, block = 'start') {
+    storeNavigationAndScroll(element: any, block: any = 'start') {
         if (window.storeNavigationHistory) {
             window.storeNavigationHistory(element);
         }

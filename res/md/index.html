@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Viewer</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <link rel="stylesheet" href="md.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script>
+        window.katexReady = Promise.resolve();
+    </script>
+</head>
+<body>
+    <div id="mainContainer"></div>
+
+    <script type="module">
+        import ThemeManager from '/dist/Theme.js';
+        import { renderMarkdownWithMath } from '/dist/MarkdownRenderer.js';
+
+        const themeManager = new ThemeManager();
+
+        // Helper function to update URL parameter
+        function updateUrlThemeParam(theme) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('m', theme);
+            window.history.replaceState({}, '', url);
+        }
+
+        // Initialize theme from URL param only
+        const urlParams = new URLSearchParams(window.location.search);
+        const themeFromUrl = urlParams.get('m') || 'dark'; // Default to dark if not specified
+        themeManager.setTheme(themeFromUrl);
+        if (window.lutexDefaultTheme) {
+            delete window.lutexDefaultTheme;
+        }
+
+        async function loadMarkdown() {
+            const markdownFile = window.lutexMarkdownFile || 'main.md';
+            try {
+                const response = await fetch(`./${markdownFile}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load ${markdownFile}: ${response.status} ${response.statusText}`);
+                }
+                return await response.text();
+            } catch (error) {
+                throw new Error(`Network error loading ${markdownFile}: ${error.message}`);
+            }
+        }
+
+        async function init() {
+            const contentElement = document.getElementById('mainContainer');
+            try {
+                const markdown = await loadMarkdown();
+                await renderMarkdownWithMath(markdown, contentElement);
+            } catch (error) {
+                console.error('Error loading content:', error);
+                contentElement.innerHTML = `
+                    <div style="max-width: 800px; margin: 100px auto; padding: 40px; background: var(--bg-secondary, #f8f9fa); border-radius: 12px; border-left: 4px solid #e74c3c;">
+                        <h2 style="color: #e74c3c; margin-top: 0;">Error Loading Content</h2>
+                        <p style="font-size: 1.1em; margin: 20px 0;"><strong>Error:</strong> ${error.message}</p>
+                        <p style="color: var(--text-secondary, #666);">Please make sure the markdown file exists in your workspace.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Add keyboard listener for 'M' key to toggle theme
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'm' || event.key === 'M') {
+                themeManager.toggle();
+                // Update URL parameter to match new theme
+                updateUrlThemeParam(themeManager.getCurrentTheme());
+            }
+        });
+
+        // Set up auto-refresh listener if running on localhost with listener port
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const listenerPort = window.lutexListenerPort;
+
+        if (isLocalHost && listenerPort) {
+            const eventSource = new EventSource(`http://localhost:${listenerPort}/event`);
+            eventSource.addEventListener('message', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'refresh') {
+                        // Save scroll position before refresh
+                        const scrollY = window.scrollY;
+                        localStorage.setItem('mdScrollPosition', scrollY.toString());
+                        location.reload();
+                    } else if (data.type === 'scroll') {
+                        // Handle scroll requests (for future use)
+                        console.log('Scroll event received:', data);
+                    }
+                } catch (error) {
+                    console.error('Error processing event:', error);
+                }
+            });
+            console.log(`Auto-refresh enabled on listener port ${listenerPort}`);
+        }
+
+        // Restore scroll position after page load
+        window.addEventListener('load', () => {
+            const savedScrollY = localStorage.getItem('mdScrollPosition');
+            if (savedScrollY !== null) {
+                window.scrollTo(0, parseInt(savedScrollY, 10));
+                // Clear the saved position after restoring
+                localStorage.removeItem('mdScrollPosition');
+            }
+        });
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

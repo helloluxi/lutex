@@ -1,4 +1,29 @@
 class LutexCore {
+    texPath: string;
+    isAppx: boolean;
+    numSecBeforeAppx: number;
+    lineNum: number;
+    env: string;
+    emptyLineCount: number;
+    envContent: string[];
+    paraHtml: string[];
+    secIdx: number;
+    subsecIdx: number;
+    autorefMap: Map<string, any>;
+    equationLabels: string[];
+    tableLabels: string[];
+    figureLabels: string[];
+    thmLabels: string[];
+    navigationData: {
+        sections: any[];
+        subsections: any[];
+        equations: any[];
+        figures: any[];
+        tables: any[];
+        theorems: any[];
+    };
+    romanNumerals: string[];
+
     constructor() {
         this.texPath = '';
         this.isAppx = false;
@@ -531,7 +556,26 @@ class LutexCore {
     }
 }
 
+// Extend Window interface to include custom properties
+declare global {
+  interface Window {
+    lutexListenerPort?: number;
+    katexOptions?: any;
+  }
+}
+
 export default class LutexArticle {
+    localHostPort: number;
+    githubRepo: string;
+    arxivNum: string;
+    titleHtml: string;
+    authorHtml: string;
+    affiliationHtml: string;
+    abstractHtml: string;
+    bibFiles: string[];
+    bodyFile: string;
+    core: LutexCore | null;
+
     constructor() {
         // Metadata
         this.localHostPort = 0;
@@ -682,10 +726,13 @@ export default class LutexArticle {
         //     html += `<h2>References</h2><ul>${refsHtml}</ul>`;
         // }
 
-        document.getElementById('content').innerHTML = html;
+        const contentElement = document.getElementById('content');
+        if (contentElement) {
+            contentElement.innerHTML = html;
+        }
     }
 
-    tryAddExtension(fileName, ext) {
+    tryAddExtension(fileName: string, ext: string) {
         return fileName.includes('.') ? fileName : fileName + ext;
     }
 

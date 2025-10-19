@@ -3,7 +3,8 @@ import * as path from 'path';
 import { registerFileCommands } from './fileCommands';
 import { registerBibtexCommands } from './bibtexCommands';
 import { ListenerServer } from './listenerServer';
-import { RendererServer } from './rendererServer';
+import { TexRendererServer } from './texRendererServer';
+import { MdRendererServer } from './mdRendererServer';
 import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
@@ -21,28 +22,51 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize servers
     const listenerServer = new ListenerServer(outputChannel);
-    const rendererServer = new RendererServer(outputChannel, context.extensionPath);
+    const texRendererServer = new TexRendererServer(outputChannel, context.extensionPath);
+    const mdRendererServer = new MdRendererServer(outputChannel, context.extensionPath);
     
     // Initialize status bar
     const statusBar = new StatusBarManager();
 
-    // Set up file watcher for .tex files to trigger refresh
+    // Initialize context keys for renderer states
+    vscode.commands.executeCommand('setContext', 'lutexRendererActive', false);
+    vscode.commands.executeCommand('setContext', 'lutexMarkdownRendererActive', false);
+
+    // Set up file watchers to trigger refresh
     const texFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.tex');
     texFileWatcher.onDidChange(() => {
-        if (listenerServer.isRunning()) {
+        if (listenerServer.isRunning() && texRendererServer.isRunning()) {
             listenerServer.notifyRefresh();
         }
     });
-    context.subscriptions.push(texFileWatcher);
+    
+    const mdFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.md');
+    mdFileWatcher.onDidChange(() => {
+        if (listenerServer.isRunning() && mdRendererServer.isRunning()) {
+            listenerServer.notifyRefresh();
+        }
+    });
+    
+    context.subscriptions.push(texFileWatcher, mdFileWatcher);
 
     // Register commands
     
-    // Launch Renderer
-    const launchRendererCommand = vscode.commands.registerCommand('lutex-ext.launchRenderer', async () => {
+    // Launch LuTeX Renderer with Listener
+    const launchLutexWithListenerCommand = vscode.commands.registerCommand('lutex-ext.launchLutexWithListener', async () => {
         try {
-            if (rendererServer.isRunning()) {
-                const port = rendererServer.getPort();
-                outputChannel.appendLine(`[LuTeX] Renderer already running on port ${port}, opening browser`);
+            // Start listener first if not already running
+            if (!listenerServer.isRunning()) {
+                const configuredListenerPort = getListenerPortFromSettings();
+                const listenerPort = configuredListenerPort > 0 ? configuredListenerPort : undefined;
+                const listenerServerPort = await listenerServer.start(listenerPort);
+                statusBar.setListenerStatus(true, listenerServerPort);
+                outputChannel.appendLine(`[LuTeX] Listener started on port ${listenerServerPort}`);
+            }
+
+            // Check if renderer is already running
+            if (texRendererServer.isRunning()) {
+                const port = texRendererServer.getPort();
+                outputChannel.appendLine(`[LuTeX] LuTeX renderer already running on port ${port}, opening browser`);
                 
                 // Build URL with parameters
                 let url = `http://localhost:${port}`;
@@ -65,13 +89,16 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
+            // Check for main.tex
             if (!(await checkMainTexExists())) return;
 
+            // Start LuTeX renderer
             const configuredPort = getRendererPortFromSettings();
             const port = configuredPort > 0 ? configuredPort : undefined;
-            const serverPort = await rendererServer.start(port);
+            const serverPort = await texRendererServer.start(port);
             
-            statusBar.setRendererStatus(true, serverPort);
+            vscode.commands.executeCommand('setContext', 'lutexRendererActive', true);
+            statusBar.setTexRendererStatus(true, serverPort);
             
             // Build URL with parameters
             let url = `http://localhost:${serverPort}`;
@@ -92,32 +119,114 @@ export function activate(context: vscode.ExtensionContext) {
             
             // Automatically open browser
             vscode.env.openExternal(vscode.Uri.parse(url));
-            outputChannel.appendLine(`[LuTeX] Renderer started on port ${serverPort}, opened in browser`);
+            outputChannel.appendLine(`[LuTeX] LuTeX renderer started on port ${serverPort} with listener integration`);
             
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to start LaTeX renderer: ${errorMessage}`);
-            outputChannel.appendLine(`[LuTeX] Activate renderer error: ${errorMessage}`);
+            vscode.window.showErrorMessage(`Failed to start LuTeX renderer: ${errorMessage}`);
+            outputChannel.appendLine(`[LuTeX] Launch LuTeX renderer error: ${errorMessage}`);
         }
     });
 
-    // Close Renderer
-    const closeRendererCommand = vscode.commands.registerCommand('lutex-ext.closeRenderer', () => {
-        if (rendererServer.isRunning()) {
-            rendererServer.stop();
-            statusBar.setRendererStatus(false);
-            outputChannel.appendLine('[LuTeX] Renderer stopped');
-        } else {
-            outputChannel.appendLine('[LuTeX] Renderer not running');
+    // Launch Markdown Renderer with Listener
+    const launchMarkdownWithListenerCommand = vscode.commands.registerCommand('lutex-ext.launchMarkdownWithListener', async () => {
+        try {
+            // Get the active markdown file
+            const editor = vscode.window.activeTextEditor;
+            let markdownFileName = 'main.md'; // default
+            
+            if (editor && editor.document.languageId === 'markdown') {
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (workspaceFolder) {
+                    const relativePath = path.relative(workspaceFolder.uri.fsPath, editor.document.uri.fsPath);
+                    markdownFileName = relativePath.replace(/\\/g, '/'); // Use forward slashes for URL
+                }
+            }
+
+            // Start listener first if not already running
+            if (!listenerServer.isRunning()) {
+                const configuredListenerPort = getListenerPortFromSettings();
+                const listenerPort = configuredListenerPort > 0 ? configuredListenerPort : undefined;
+                const listenerServerPort = await listenerServer.start(listenerPort);
+                statusBar.setListenerStatus(true, listenerServerPort);
+                outputChannel.appendLine(`[LuTeX] Listener started on port ${listenerServerPort}`);
+            }
+
+            // Check if markdown renderer is already running
+            if (mdRendererServer.isRunning()) {
+                const port = mdRendererServer.getPort();
+                outputChannel.appendLine(`[LuTeX] Markdown renderer already running on port ${port}, opening browser`);
+                
+                // Build URL with parameters
+                let url = `http://localhost:${port}`;
+                const params = new URLSearchParams();
+                
+                // Add markdown file parameter
+                params.append('f', markdownFileName);
+                
+                if (listenerServer.isRunning()) {
+                    const listenerPort = listenerServer.getPort();
+                    params.append('o', listenerPort!.toString());
+                }
+                
+                const theme = getThemeFromSettings();
+                params.append('m', theme);
+                
+                const queryString = params.toString();
+                if (queryString) {
+                    url += `?${queryString}`;
+                }
+                
+                vscode.env.openExternal(vscode.Uri.parse(url));
+                return;
+            }
+
+            // Start markdown renderer
+            const configuredPort = getRendererPortFromSettings();
+            const port = configuredPort > 0 ? configuredPort : undefined;
+            const serverPort = await mdRendererServer.start(port);
+            
+            vscode.commands.executeCommand('setContext', 'lutexMarkdownRendererActive', true);
+            statusBar.setMdRendererStatus(true, serverPort);
+            
+            // Build URL with parameters
+            let url = `http://localhost:${serverPort}`;
+            const params = new URLSearchParams();
+            
+            // Add markdown file parameter
+            params.append('f', markdownFileName);
+            
+            if (listenerServer.isRunning()) {
+                const listenerPort = listenerServer.getPort();
+                params.append('o', listenerPort!.toString());
+            }
+            
+            const theme = getThemeFromSettings();
+            params.append('m', theme);
+            
+            const queryString = params.toString();
+            if (queryString) {
+                url += `?${queryString}`;
+            }
+            
+            // Automatically open browser
+            vscode.env.openExternal(vscode.Uri.parse(url));
+            outputChannel.appendLine(`[LuTeX] Markdown renderer started on port ${serverPort} with listener integration (file: ${markdownFileName})`);
+            
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to start Markdown renderer: ${errorMessage}`);
+            outputChannel.appendLine(`[LuTeX] Launch Markdown renderer error: ${errorMessage}`);
         }
     });
 
-    // Launch Listener
+    // Launch Listener Only
     const launchListenerCommand = vscode.commands.registerCommand('lutex-ext.launchListener', async () => {
         try {
             if (listenerServer.isRunning()) {
                 const port = listenerServer.getPort();
                 outputChannel.appendLine(`[LuTeX] Listener already running on port ${port}`);
+                vscode.window.showInformationMessage(`Listener already running on port ${port}`);
                 return;
             }
 
@@ -127,99 +236,47 @@ export function activate(context: vscode.ExtensionContext) {
             
             statusBar.setListenerStatus(true, serverPort);
             outputChannel.appendLine(`[LuTeX] Listener started on port ${serverPort}`);
+            vscode.window.showInformationMessage(`Listener started on port ${serverPort}`);
             
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to start line jumping listener: ${errorMessage}`);
-            outputChannel.appendLine(`[LuTeX] Activate listener error: ${errorMessage}`);
+            vscode.window.showErrorMessage(`Failed to start listener: ${errorMessage}`);
+            outputChannel.appendLine(`[LuTeX] Launch listener error: ${errorMessage}`);
         }
     });
 
-    // Close Listener
-    const closeListenerCommand = vscode.commands.registerCommand('lutex-ext.closeListener', () => {
+    // Close All
+    const closeAllCommand = vscode.commands.registerCommand('lutex-ext.closeAll', () => {
+        let stopped: string[] = [];
+        
+        if (texRendererServer.isRunning()) {
+            texRendererServer.stop();
+            vscode.commands.executeCommand('setContext', 'lutexRendererActive', false);
+            statusBar.setTexRendererStatus(false);
+            stopped.push('LuTeX renderer');
+            outputChannel.appendLine('[LuTeX] LuTeX renderer stopped');
+        }
+        
+        if (mdRendererServer.isRunning()) {
+            mdRendererServer.stop();
+            vscode.commands.executeCommand('setContext', 'lutexMarkdownRendererActive', false);
+            statusBar.setMdRendererStatus(false);
+            stopped.push('Markdown renderer');
+            outputChannel.appendLine('[LuTeX] Markdown renderer stopped');
+        }
+        
         if (listenerServer.isRunning()) {
             listenerServer.stop();
             statusBar.setListenerStatus(false);
+            stopped.push('Listener');
             outputChannel.appendLine('[LuTeX] Listener stopped');
+        }
+        
+        if (stopped.length > 0) {
+            outputChannel.appendLine(`[LuTeX] Stopped: ${stopped.join(', ')}`);
         } else {
-            outputChannel.appendLine('[LuTeX] Listener not running');
+            outputChannel.appendLine('[LuTeX] No services were running');
         }
-    });
-
-    // Launch Both
-    const launchCommand = vscode.commands.registerCommand('lutex-ext.launch', async () => {
-        try {
-            // Start listener first
-            if (!listenerServer.isRunning()) {
-                const configuredListenerPort = getListenerPortFromSettings();
-                const listenerPort = configuredListenerPort > 0 ? configuredListenerPort : undefined;
-                const listenerServerPort = await listenerServer.start(listenerPort);
-                statusBar.setListenerStatus(true, listenerServerPort);
-                outputChannel.appendLine(`[LuTeX] Listener started on port ${listenerServerPort}`);
-            }
-
-            // Then start renderer (which will automatically include listener param)
-            if (!rendererServer.isRunning()) {
-                if (!(await checkMainTexExists())) return;
-
-                const configuredRendererPort = getRendererPortFromSettings();
-                const rendererPort = configuredRendererPort > 0 ? configuredRendererPort : undefined;
-                const rendererServerPort = await rendererServer.start(rendererPort);
-                statusBar.setRendererStatus(true, rendererServerPort);
-
-                // Build URL with parameters
-                let url = `http://localhost:${rendererServerPort}`;
-                const params = new URLSearchParams();
-                
-                if (listenerServer.isRunning()) {
-                    const listenerPort = listenerServer.getPort();
-                    params.append('o', listenerPort!.toString());
-                }
-                
-                const theme = getThemeFromSettings();
-                params.append('m', theme);
-                
-                const queryString = params.toString();
-                if (queryString) {
-                    url += `?${queryString}`;
-                }
-
-                // Automatically open browser
-                vscode.env.openExternal(vscode.Uri.parse(url));
-                outputChannel.appendLine(`[LuTeX] Both services started - renderer: ${rendererServerPort}, listener: ${listenerServer.getPort()}, opened in browser`);
-            } else {
-                // If renderer is already running, just ensure browser opens with parameters
-                const rendererPort = rendererServer.getPort();
-                let url = `http://localhost:${rendererPort}`;
-                const params = new URLSearchParams();
-                
-                if (listenerServer.isRunning()) {
-                    const listenerPort = listenerServer.getPort();
-                    params.append('o', listenerPort!.toString());
-                }
-                
-                const theme = getThemeFromSettings();
-                params.append('m', theme);
-                
-                const queryString = params.toString();
-                if (queryString) {
-                    url += `?${queryString}`;
-                }
-                
-                vscode.env.openExternal(vscode.Uri.parse(url));
-                outputChannel.appendLine(`[LuTeX] Renderer already running, opened with listener integration`);
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to start services: ${errorMessage}`);
-            outputChannel.appendLine(`[LuTeX] Launch both error: ${errorMessage}`);
-        }
-    });
-
-    // Close Both  
-    const closeCommand = vscode.commands.registerCommand('lutex-ext.close', () => {
-        vscode.commands.executeCommand('lutex-ext.closeRenderer');
-        vscode.commands.executeCommand('lutex-ext.closeListener');
     });
 
     // Jump to HTML element based on current cursor position
@@ -245,60 +302,110 @@ export function activate(context: vscode.ExtensionContext) {
         listenerServer.notifyScroll(fileName, lineNumber);
     });
 
-    // Status bar toggle command
-    const toggleStatusCommand = vscode.commands.registerCommand('lutex-ext.toggleStatus', async () => {
-        const options: string[] = [];
+    // Status bar click command - show quick pick menu
+    const showStatusCommand = vscode.commands.registerCommand('lutex-ext.showStatus', async () => {
+        const options: vscode.QuickPickItem[] = [];
         
-        if (rendererServer.isRunning()) {
-            options.push('Stop Renderer');
+        // Add options based on current state
+        if (!texRendererServer.isRunning()) {
+            options.push({
+                label: '$(play) Launch LuTeX Renderer with Listener',
+                description: 'Start LuTeX (LaTeX) renderer and listener',
+                detail: 'Opens a browser with the LaTeX renderer'
+            });
         } else {
-            options.push('Start Renderer');
+            options.push({
+                label: '$(debug-stop) Stop LuTeX Renderer',
+                description: `Currently running on port ${texRendererServer.getPort()}`,
+                detail: 'Stop the LaTeX renderer'
+            });
         }
         
-        if (listenerServer.isRunning()) {
-            options.push('Stop Listener');
+        if (!mdRendererServer.isRunning()) {
+            options.push({
+                label: '$(play) Launch Markdown Renderer with Listener',
+                description: 'Start Markdown renderer and listener',
+                detail: 'Opens a browser with the Markdown renderer'
+            });
         } else {
-            options.push('Start Listener');
+            options.push({
+                label: '$(debug-stop) Stop Markdown Renderer',
+                description: `Currently running on port ${mdRendererServer.getPort()}`,
+                detail: 'Stop the Markdown renderer'
+            });
         }
         
-        options.push('Start Both', 'Stop Both');
+        if (!listenerServer.isRunning()) {
+            options.push({
+                label: '$(radio-tower) Launch Listener Only',
+                description: 'Start listener without renderer',
+                detail: 'For two-way communication with external renderers'
+            });
+        } else {
+            options.push({
+                label: '$(debug-stop) Stop Listener',
+                description: `Currently running on port ${listenerServer.getPort()}`,
+                detail: 'Stop the listener'
+            });
+        }
+        
+        // Always show close all if anything is running
+        if (texRendererServer.isRunning() || mdRendererServer.isRunning() || listenerServer.isRunning()) {
+            options.push({
+                label: '$(trash) Close All',
+                description: 'Stop all running services',
+                detail: 'Stop renderers and listener'
+            });
+        }
 
         const selection = await vscode.window.showQuickPick(options, {
-            placeHolder: 'Choose action'
+            placeHolder: 'Select LuTeX action',
+            matchOnDescription: true,
+            matchOnDetail: true
         });
 
-        switch (selection) {
-            case 'Start Renderer':
-                await vscode.commands.executeCommand('lutex-ext.launchRenderer');
-                break;
-            case 'Stop Renderer':
-                await vscode.commands.executeCommand('lutex-ext.closeRenderer');
-                break;
-            case 'Start Listener':
-                await vscode.commands.executeCommand('lutex-ext.launchListener');
-                break;
-            case 'Stop Listener':
-                await vscode.commands.executeCommand('lutex-ext.closeListener');
-                break;
-            case 'Start Both':
-                await vscode.commands.executeCommand('lutex-ext.launch');
-                break;
-            case 'Stop Both':
-                await vscode.commands.executeCommand('lutex-ext.close');
-                break;
+        if (!selection) return;
+
+        // Execute based on selection
+        if (selection.label.includes('LuTeX Renderer with Listener')) {
+            await vscode.commands.executeCommand('lutex-ext.launchLutexWithListener');
+        } else if (selection.label.includes('Markdown Renderer with Listener')) {
+            await vscode.commands.executeCommand('lutex-ext.launchMarkdownWithListener');
+        } else if (selection.label.includes('Listener Only')) {
+            await vscode.commands.executeCommand('lutex-ext.launchListener');
+        } else if (selection.label.includes('Stop LuTeX Renderer')) {
+            if (texRendererServer.isRunning()) {
+                texRendererServer.stop();
+                vscode.commands.executeCommand('setContext', 'lutexRendererActive', false);
+                statusBar.setTexRendererStatus(false);
+                outputChannel.appendLine('[LuTeX] LuTeX renderer stopped');
+            }
+        } else if (selection.label.includes('Stop Markdown Renderer')) {
+            if (mdRendererServer.isRunning()) {
+                mdRendererServer.stop();
+                vscode.commands.executeCommand('setContext', 'lutexMarkdownRendererActive', false);
+                statusBar.setMdRendererStatus(false);
+                outputChannel.appendLine('[LuTeX] Markdown renderer stopped');
+            }
+        } else if (selection.label.includes('Stop Listener')) {
+            if (listenerServer.isRunning()) {
+                listenerServer.stop();
+                statusBar.setListenerStatus(false);
+                outputChannel.appendLine('[LuTeX] Listener stopped');
+            }
+        } else if (selection.label.includes('Close All')) {
+            await vscode.commands.executeCommand('lutex-ext.closeAll');
         }
     });
 
     // Register all commands
     context.subscriptions.push(
-        launchRendererCommand,
-        closeRendererCommand,
+        launchLutexWithListenerCommand,
+        launchMarkdownWithListenerCommand,
         launchListenerCommand,
-        closeListenerCommand,
-        launchCommand,
-        closeCommand,
+        closeAllCommand,
         jumpToHtmlCommand,
-        toggleStatusCommand,
+        showStatusCommand,
         statusBar
     );
 
@@ -306,7 +413,10 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push({
         dispose: () => {
             listenerServer.stop();
-            rendererServer.stop();
+            texRendererServer.stop();
+            mdRendererServer.stop();
+            vscode.commands.executeCommand('setContext', 'lutexRendererActive', false);
+            vscode.commands.executeCommand('setContext', 'lutexMarkdownRendererActive', false);
             outputChannel.dispose();
         }
     });

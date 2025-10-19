@@ -5,15 +5,17 @@ import * as vscode from 'vscode';
 import { jumpToLine } from './fileNavigation';
 import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse } from './tools';
 
-export class RendererServer {
+export class TexRendererServer {
     private server: http.Server;
     private outputChannel: vscode.OutputChannel;
     private resourcesPath: string;
+    private distResourcesPath: string;
     private port: number | null = null;
 
     constructor(outputChannel: vscode.OutputChannel, extensionPath: string) {
         this.outputChannel = outputChannel;
-        this.resourcesPath = path.join(extensionPath, 'resources', 'web');
+        this.resourcesPath = path.join(extensionPath, 'res', 'tex');
+        this.distResourcesPath = path.join(extensionPath, 'res', 'dist');
         this.server = this.createServer();
     }
 
@@ -106,9 +108,13 @@ export class RendererServer {
                 this.serveModifiedIndexHtml(filePath, listenerPort, themeMode, res);
                 return;
             }
-        } else if (pathname.startsWith('/src/')) {
-            // Serve files from the src directory
-            filePath = path.join(this.resourcesPath, pathname);
+        } else if (pathname.startsWith('/dist/')) {
+            // Serve compiled JS files from dist directory
+            const jsFileName = pathname.substring(6); // Remove '/dist/'
+            filePath = path.join(this.distResourcesPath, jsFileName);
+        } else if (pathname.endsWith('.css')) {
+            // Serve CSS files from resources directory
+            filePath = path.join(this.resourcesPath, pathname.substring(1));
         } else if (pathname === '/main.tex' || pathname.endsWith('.tex') || pathname.endsWith('.bib')) {
             // Serve LaTeX files from the workspace
             const fileName = pathname.startsWith('/') ? pathname.substring(1) : pathname;

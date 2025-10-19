@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "ES2015",
     "target": "ES2020",
-    "outDir": "out",
-    "rootDir": "src",
-    "lib": ["ES2020"],
+    "outDir": "res/dist",
+    "rootDir": "src/ts",
+    "lib": ["ES2020", "DOM"],
     "sourceMap": true,
     "strict": false,
     "esModuleInterop": true,
@@ -15,16 +15,12 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
-    "resolveJsonModule": true
+    "declaration": true
   },
   "include": [
-    "src/**/*"
+    "src/ts/**/*"
   ],
   "exclude": [
-    "node_modules",
-    ".vscode",
-    "out",
-    "res",
-    "src/ts/**/*"
+    "node_modules"
   ]
 }

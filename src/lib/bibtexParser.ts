@@ -1,370 +1,406 @@
-// TypeScript port of bibtexParse.js with improved type safety
+// @ts-nocheck
+/* start bibtexParse 0.0.24 */
 
-interface BibtexEntry {
-    citationKey?: string;
-    entryType: string;
-    entryTags?: { [key: string]: string };
-    entry?: string;
-}
+//Original work by Henrik Muehe (c) 2010
+//
+//CommonJS port by Mikola Lysenko 2013
+//
+//Choice of compact (default) or pretty output from toBibtex:
+//		Nick Bailey, 2017.
+//
+//Port to Browser lib by ORCID / RCPETERS
+//
+//Issues:
+//no comment handling within strings
+//no string concatenation
+//no variable values yet
+//Grammar implemented here:
+//bibtex -> (string | preamble | comment | entry)*;
+//string -> '@STRING' '{' key_equals_value '}';
+//preamble -> '@PREAMBLE' '{' value '}';
+//comment -> '@COMMENT' '{' value '}';
+//entry -> '@' key '{' key ',' key_value_list '}';
+//key_value_list -> key_equals_value (',' key_equals_value)*;
+//key_equals_value -> key '=' value;
+//value -> value_quotes | value_braces | key;
+//value_quotes -> '"' .*? '"'; // not quite
+//value_braces -> '{' .*? '"'; // not quite
+(function(exports) {
 
-class BibtexParser {
-    private months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-    private notKey = [',', '{', '}', ' ', '='];
-    private pos = 0;
-    private input = "";
-    private entries: BibtexEntry[] = [];
-    private currentEntry: BibtexEntry = { entryType: "" };
-
-    setInput(input: string): void {
-        this.input = input;
+    function BibtexParser() {
+  
+        this.months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+        this.notKey = [',','{','}',' ','='];
         this.pos = 0;
-        this.entries = [];
-    }
-
-    getEntries(): BibtexEntry[] {
-        return this.entries;
-    }
-
-    private isWhitespace(s: string): boolean {
-        return (s === ' ' || s === '\r' || s === '\t' || s === '\n');
-    }
-
-    private match(s: string, canCommentOut: boolean = true): void {
-        this.skipWhitespace(canCommentOut);
-        if (this.input.substring(this.pos, this.pos + s.length) === s) {
-            this.pos += s.length;
-        } else {
-            throw new TypeError(`Token mismatch: expected ${s}, found ${this.input.substring(this.pos)}`);
-        }
-        this.skipWhitespace(canCommentOut);
-    }
-
-    private tryMatch(s: string, canCommentOut: boolean = true): boolean {
-        this.skipWhitespace(canCommentOut);
-        if (this.input.substring(this.pos, this.pos + s.length) === s) {
-            return true;
-        }
-        return false;
-    }
-
-    private matchAt(): boolean {
-        while (this.input.length > this.pos && this.input[this.pos] !== '@') {
-            this.pos++;
-        }
-        return this.input[this.pos] === '@';
-    }
-
-    private skipWhitespace(canCommentOut: boolean): void {
-        while (this.pos < this.input.length && this.isWhitespace(this.input[this.pos])) {
-            this.pos++;
-        }
-        if (this.pos < this.input.length && this.input[this.pos] === "%" && canCommentOut) {
-            while (this.pos < this.input.length && this.input[this.pos] !== "\n") {
-                this.pos++;
-            }
+        this.input = "";
+        this.entries = new Array();
+  
+        this.currentEntry = "";
+  
+        this.setInput = function(t) {
+            this.input = t;
+        };
+  
+        this.getEntries = function() {
+            return this.entries;
+        };
+  
+        this.isWhitespace = function(s) {
+            return (s == ' ' || s == '\r' || s == '\t' || s == '\n');
+        };
+  
+        this.match = function(s, canCommentOut) {
+            if (canCommentOut == undefined || canCommentOut == null)
+                canCommentOut = true;
             this.skipWhitespace(canCommentOut);
-        }
-    }
-
-    private valueBraces(): string {
-        let bracecount = 0;
-        this.match("{", false);
-        const start = this.pos;
-        let escaped = false;
-        
-        while (true) {
-            if (this.pos >= this.input.length - 1) {
-                throw new TypeError("Unterminated value: value_braces");
-            }
-            
-            if (!escaped) {
-                if (this.input[this.pos] === '}') {
-                    if (bracecount > 0) {
-                        bracecount--;
-                    } else {
-                        const end = this.pos;
-                        this.match("}", false);
-                        return this.input.substring(start, end);
-                    }
-                } else if (this.input[this.pos] === '{') {
-                    bracecount++;
-                }
-            }
-            
-            escaped = this.input[this.pos] === '\\' && !escaped;
-            this.pos++;
-        }
-    }
-
-    private valueQuotes(): string {
-        this.match('"', false);
-        const start = this.pos;
-        let escaped = false;
-        
-        while (true) {
-            if (this.pos >= this.input.length - 1) {
-                throw new TypeError("Unterminated value: value_quotes");
-            }
-            
-            if (!escaped && this.input[this.pos] === '"') {
-                const end = this.pos;
-                this.match('"', false);
-                return this.input.substring(start, end);
-            }
-            
-            escaped = this.input[this.pos] === '\\' && !escaped;
-            this.pos++;
-        }
-    }
-
-    private valueComment(): string {
-        let str = '';
-        let brcktCnt = 0;
-        
-        while (!(this.tryMatch("}", false) && brcktCnt === 0)) {
-            if (this.pos >= this.input.length - 1) {
-                throw new TypeError("Unterminated value: value_comment");
-            }
-            
-            str += this.input[this.pos];
-            if (this.input[this.pos] === '{') brcktCnt++;
-            if (this.input[this.pos] === '}') brcktCnt--;
-            this.pos++;
-        }
-        
-        return str;
-    }
-
-    private singleValue(): string {
-        if (this.tryMatch("{")) {
-            return this.valueBraces();
-        } else if (this.tryMatch('"')) {
-            return this.valueQuotes();
-        } else {
-            const k = this.key();
-            if (k.match("^[0-9]+$")) {
-                return k;
-            } else if (this.months.indexOf(k.toLowerCase()) >= 0) {
-                return k.toLowerCase();
+            if (this.input.substring(this.pos, this.pos + s.length) == s) {
+                this.pos += s.length;
             } else {
-                throw new Error(`Value expected: ${k}`);
-            }
-        }
-    }
-
-    private value(): string {
-        const values: string[] = [];
-        values.push(this.singleValue());
-        
-        while (this.tryMatch("#")) {
-            this.match("#");
-            values.push(this.singleValue());
-        }
-        
-        return values.join("");
-    }
-
-    private key(optional: boolean = false): string {
-        const start = this.pos;
-        
-        while (true) {
-            if (this.pos >= this.input.length) {
-                throw new TypeError("Runaway key");
-            }
-            
-            if (this.notKey.indexOf(this.input[this.pos]) >= 0) {
-                if (optional && this.input[this.pos] !== ',') {
-                    this.pos = start;
-                    return "";
-                }
-                return this.input.substring(start, this.pos);
+                throw TypeError("Token mismatch: match", "expected " + s + ", found "
+                        + this.input.substring(this.pos));
+            };
+            this.skipWhitespace(canCommentOut);
+        };
+  
+        this.tryMatch = function(s, canCommentOut) {
+            if (canCommentOut == undefined || canCommentOut == null)
+                canCommentOut = true;
+            this.skipWhitespace(canCommentOut);
+            if (this.input.substring(this.pos, this.pos + s.length) == s) {
+                return true;
             } else {
+                return false;
+            };
+            this.skipWhitespace(canCommentOut);
+        };
+  
+        /* when search for a match all text can be ignored, not just white space */
+        this.matchAt = function() {
+            while (this.input.length > this.pos && this.input[this.pos] != '@') {
                 this.pos++;
-            }
-        }
-    }
-
-    private keyEqualsValue(): [string, string] {
-        const key = this.key();
-        if (this.tryMatch("=")) {
-            this.match("=");
-            const val = this.value();
-            return [key.trim(), val];
-        } else {
-            throw new TypeError("Value expected, equals sign missing");
-        }
-    }
-
-    private keyValueList(): void {
-        const kv = this.keyEqualsValue();
-        this.currentEntry.entryTags = {};
-        this.currentEntry.entryTags[kv[0]] = kv[1];
-        
-        while (this.tryMatch(",")) {
-            this.match(",");
-            if (this.tryMatch("}")) {
-                break;
-            }
-            const kvPair = this.keyEqualsValue();
-            this.currentEntry.entryTags[kvPair[0]] = kvPair[1];
-        }
-    }
-
-    private entryBody(d: string): void {
-        this.currentEntry = { entryType: d.substring(1) };
-        const citationKey = this.key(true);
-        if (citationKey) {
-            this.currentEntry.citationKey = citationKey;
-            this.match(",");
-        }
-        this.keyValueList();
-        this.entries.push(this.currentEntry);
-    }
-
-    private directive(): string {
-        this.match("@");
-        return "@" + this.key();
-    }
-
-    private preamble(): void {
-        this.currentEntry = { entryType: 'PREAMBLE' };
-        this.currentEntry.entry = this.valueComment();
-        this.entries.push(this.currentEntry);
-    }
-
-    private comment(): void {
-        this.currentEntry = { entryType: 'COMMENT' };
-        this.currentEntry.entry = this.valueComment();
-        this.entries.push(this.currentEntry);
-    }
-
-    private entry(d: string): void {
-        this.entryBody(d);
-    }
-
-    private alternativeCitationKey(): void {
-        this.entries.forEach(entry => {
-            if (!entry.citationKey && entry.entryTags) {
-                entry.citationKey = '';
-                if (entry.entryTags.author) {
-                    entry.citationKey += entry.entryTags.author.split(',')[0] + ', ';
+            };
+  
+            if (this.input[this.pos] == '@') {
+                return true;
+            };
+            return false;
+        };
+  
+        this.skipWhitespace = function(canCommentOut) {
+            while (this.isWhitespace(this.input[this.pos])) {
+                this.pos++;
+            };
+            if (this.input[this.pos] == "%" && canCommentOut == true) {
+                while (this.input[this.pos] != "\n") {
+                    this.pos++;
+                };
+                this.skipWhitespace(canCommentOut);
+            };
+        };
+  
+        this.value_braces = function() {
+            var bracecount = 0;
+            this.match("{", false);
+            var start = this.pos;
+            var escaped = false;
+            while (true) {
+                if (!escaped) {
+                    if (this.input[this.pos] == '}') {
+                        if (bracecount > 0) {
+                            bracecount--;
+                        } else {
+                            var end = this.pos;
+                            this.match("}", false);
+                            return this.input.substring(start, end);
+                        };
+                    } else if (this.input[this.pos] == '{') {
+                        bracecount++;
+                    } else if (this.pos >= this.input.length - 1) {
+                        throw TypeError("Unterminated value: value_braces");
+                    };
+                };
+                if (this.input[this.pos] == '\\' && escaped == false)
+                    escaped = true;
+                else
+                    escaped = false;
+                this.pos++;
+            };
+        };
+  
+        this.value_comment = function() {
+            var str = '';
+            var brcktCnt = 0;
+            while (!(this.tryMatch("}", false) && brcktCnt == 0)) {
+                str = str + this.input[this.pos];
+                if (this.input[this.pos] == '{')
+                    brcktCnt++;
+                if (this.input[this.pos] == '}')
+                    brcktCnt--;
+                if (this.pos >= this.input.length - 1) {
+                    throw TypeError("Unterminated value: value_comment", + this.input.substring(start));
+                };
+                this.pos++;
+            };
+            return str;
+        };
+  
+        this.value_quotes = function() {
+            this.match('"', false);
+            var start = this.pos;
+            var escaped = false;
+            while (true) {
+                if (!escaped) {
+                    if (this.input[this.pos] == '"') {
+                        var end = this.pos;
+                        this.match('"', false);
+                        return this.input.substring(start, end);
+                    } else if (this.pos >= this.input.length - 1) {
+                        throw TypeError("Unterminated value: value_quotes", this.input.substring(start));
+                    };
                 }
-                entry.citationKey += entry.entryTags.year || '';
-            }
-        });
-    }
-
-    bibtex(): void {
-        while (this.matchAt()) {
-            const d = this.directive();
-            this.match("{");
-            
-            if (d.toUpperCase() === "@STRING") {
-                // Handle @STRING entries (not implemented in original)
-            } else if (d.toUpperCase() === "@PREAMBLE") {
-                this.preamble();
-            } else if (d.toUpperCase() === "@COMMENT") {
-                this.comment();
+                if (this.input[this.pos] == '\\' && escaped == false)
+                    escaped = true;
+                else
+                    escaped = false;
+                this.pos++;
+            };
+        };
+  
+        this.single_value = function() {
+            var start = this.pos;
+            if (this.tryMatch("{")) {
+                return this.value_braces();
+            } else if (this.tryMatch('"')) {
+                return this.value_quotes();
             } else {
-                this.entry(d);
+                var k = this.key();
+                if (k.match("^[0-9]+$"))
+                    return k;
+                else if (this.months.indexOf(k.toLowerCase()) >= 0)
+                    return k.toLowerCase();
+                else
+                    throw "Value expected: single_value" + this.input.substring(start) + ' for key: ' + k;
+  
+            };
+        };
+  
+        this.value = function() {
+            var values = [];
+            values.push(this.single_value());
+            while (this.tryMatch("#")) {
+                this.match("#");
+                values.push(this.single_value());
+            };
+            return values.join("");
+        };
+  
+        this.key = function(optional) {
+            var start = this.pos;
+            while (true) {
+                if (this.pos >= this.input.length) {
+                    throw TypeError("Runaway key: key");
+                };
+                                // а-яА-Я is Cyrillic
+                //console.log(this.input[this.pos]);
+                if (this.notKey.indexOf(this.input[this.pos]) >= 0) {
+                    if (optional && this.input[this.pos] != ',') {
+                        this.pos = start;
+                        return null;
+                    };
+                    return this.input.substring(start, this.pos);
+                } else {
+                    this.pos++;
+  
+                };
+            };
+        };
+  
+        this.key_equals_value = function() {
+            var key = this.key();
+            if (this.tryMatch("=")) {
+                this.match("=");
+                var val = this.value();
+                key = key.trim()
+                return [ key, val ];
+            } else {
+                throw TypeError("Value expected, equals sign missing: key_equals_value",
+                     this.input.substring(this.pos));
+            };
+        };
+  
+        this.key_value_list = function() {
+            var kv = this.key_equals_value();
+            this.currentEntry['entryTags'] = {};
+            this.currentEntry['entryTags'][kv[0]] = kv[1];
+            while (this.tryMatch(",")) {
+                this.match(",");
+                // fixes problems with commas at the end of a list
+                if (this.tryMatch("}")) {
+                    break;
+                }
+                ;
+                kv = this.key_equals_value();
+                this.currentEntry['entryTags'][kv[0]] = kv[1];
+            };
+        };
+  
+        this.entry_body = function(d) {
+            this.currentEntry = {};
+            this.currentEntry['citationKey'] = this.key(true);
+            this.currentEntry['entryType'] = d.substring(1);
+            if (this.currentEntry['citationKey'] != null) {
+                this.match(",");
             }
-            
-            this.match("}");
+            this.key_value_list();
+            this.entries.push(this.currentEntry);
+        };
+  
+        this.directive = function() {
+            this.match("@");
+            return "@" + this.key();
+        };
+  
+        this.preamble = function() {
+            this.currentEntry = {};
+            this.currentEntry['entryType'] = 'PREAMBLE';
+            this.currentEntry['entry'] = this.value_comment();
+            this.entries.push(this.currentEntry);
+        };
+  
+        this.comment = function() {
+            this.currentEntry = {};
+            this.currentEntry['entryType'] = 'COMMENT';
+            this.currentEntry['entry'] = this.value_comment();
+            this.entries.push(this.currentEntry);
+        };
+  
+        this.entry = function(d) {
+            this.entry_body(d);
+        };
+  
+        this.alernativeCitationKey = function () {
+            this.entries.forEach(function (entry) {
+                if (!entry.citationKey && entry.entryTags) {
+                    entry.citationKey = '';
+                    if (entry.entryTags.author) {
+                        entry.citationKey += entry.entryTags.author.split(',')[0] += ', ';
+                    }
+                    entry.citationKey += entry.entryTags.year;
+                }
+            });
         }
+  
+        this.bibtex = function() {
+            while (this.matchAt()) {
+                var d = this.directive();
+                this.match("{");
+                if (d.toUpperCase() == "@STRING") {
+                    this.string();
+                } else if (d.toUpperCase() == "@PREAMBLE") {
+                    this.preamble();
+                } else if (d.toUpperCase() == "@COMMENT") {
+                    this.comment();
+                } else {
+                    this.entry(d);
+                }
+                this.match("}");
+            };
+  
+            this.alernativeCitationKey();
+        };
+    };
+  
+    exports.toJSON = function(bibtex) {
+        var b = new BibtexParser();
+        b.setInput(bibtex);
+        b.bibtex();
+        return b.entries;
+    };
+  
+    /* added during hackathon don't hate on me */
+    /* Increased the amount of white-space to make entries
+     * more attractive to humans. Pass compact as false
+     * to enable */
+    exports.toBibtex = function(json, compact) {
+        if (compact === undefined) compact = true;
+        var out = '';
         
-        this.alternativeCitationKey();
-    }
-}
-
-export function toJSON(bibtex: string): BibtexEntry[] {
-    const parser = new BibtexParser();
-    parser.setInput(bibtex);
-    parser.bibtex();
-    return parser.getEntries();
-}
-
-export function toBibtex(entries: BibtexEntry[], compact: boolean = true): string {
-    let out = '';
-    
-    // Define field order for better human readability
-    const fieldOrder = [
-        'title', 'author', 'journal', 'booktitle', 'year', 'volume', 'number', 
-        'pages', 'month', 'publisher', 'address', 'edition', 'editor', 
-        'institution', 'organization', 'school', 'note', 'doi', 'url', 'isbn', 'issn'
-    ];
-    
-    for (const entry of entries) {
-        out += `@${entry.entryType.toLowerCase()}{`;
-        
-        if (compact) {
-            // Compact format (original behavior)
-            if (entry.citationKey) {
-                out += entry.citationKey + ',';
-            }
-            
-            if (entry.entry) {
-                out += entry.entry;
-            }
-            
-            if (entry.entryTags) {
-                let tags = '';
-                for (const key in entry.entryTags) {
-                    if (tags.length > 0) tags += ',';
-                    tags += key + '={' + entry.entryTags[key] + '}';
+        var entrysep = ',';
+        var indent = '';
+        if (!compact) {
+          entrysep = ',\n';
+          indent = '    ';        
+        }
+        for ( var i in json) {
+            out += "@" + json[i].entryType;
+            out += '{';
+            if (json[i].citationKey)
+                out += json[i].citationKey + entrysep;
+            if (json[i].entry)
+                out += json[i].entry ;
+            if (json[i].entryTags) {
+                var tags = indent;
+                for (var jdx in json[i].entryTags) {
+                    if (tags.trim().length != 0)
+                        tags += entrysep + indent;
+                    tags += jdx + (compact ? '={' : ' = {') + 
+                            json[i].entryTags[jdx] + '}';
                 }
                 out += tags;
             }
-            
-            out += '}\n';
-        } else {
-            // Human-readable format with proper indentation and field ordering
-            if (entry.citationKey) {
-                out += entry.citationKey + ',\n';
-            }
-            
-            if (entry.entry) {
-                out += '    ' + entry.entry + '\n';
-            }
-            
-            if (entry.entryTags) {
-                // Sort fields according to preferred order
-                const sortedKeys = Object.keys(entry.entryTags).sort((a, b) => {
-                    const aIndex = fieldOrder.indexOf(a.toLowerCase());
-                    const bIndex = fieldOrder.indexOf(b.toLowerCase());
-                    
-                    if (aIndex !== -1 && bIndex !== -1) {
-                        return aIndex - bIndex;
-                    } else if (aIndex !== -1) {
-                        return -1;
-                    } else if (bIndex !== -1) {
-                        return 1;
-                    } else {
-                        return a.localeCompare(b);
-                    }
-                });
-                
-                for (let i = 0; i < sortedKeys.length; i++) {
-                    const key = sortedKeys[i];
-                    const value = entry.entryTags[key];
-                    
-                    // Add proper indentation and alignment
-                    const paddedKey = key.padEnd(12); // Align values for readability
-                    out += `    ${paddedKey} = {${value}}`;
-                    
-                    // Add comma except for the last field
-                    if (i < sortedKeys.length - 1) {
-                        out += ',';
-                    }
-                    
-                    out += '\n';
-                }
-            }
-            
-            out += '}\n\n';
+            out += compact ? '}\n' : '\n}\n\n';
         }
-    }
+        return out;
+  
+    };
+  
+  })(typeof exports === 'undefined' ? this['bibtexParse'] = {} : exports);
+  
+  /* end bibtexParse */
+
+// TypeScript exports
+export interface BibtexEntry {
+    citationKey?: string;
+    entryType: string;
+    entry?: string;
+    entryTags?: { [key: string]: string };
+}
+
+export function toJSON(bibtex: string): BibtexEntry[] {
+    const b = new (BibtexParser as any)();
+    b.setInput(bibtex);
+    b.bibtex();
+    return b.entries;
+}
+
+export function toBibtex(json: BibtexEntry[], compact?: boolean): string {
+    if (compact === undefined) compact = true;
+    let out = '';
     
+    const entrysep = compact ? ',' : ',\n';
+    const indent = compact ? '' : '    ';
+    
+    for (let i in json) {
+        out += "@" + json[i].entryType;
+        out += '{';
+        if (json[i].citationKey)
+            out += json[i].citationKey + entrysep;
+        if (json[i].entry)
+            out += json[i].entry;
+        if (json[i].entryTags) {
+            let tags = indent;
+            for (let jdx in json[i].entryTags) {
+                if (tags.trim().length != 0)
+                    tags += entrysep + indent;
+                tags += jdx + (compact ? '={' : ' = {') + 
+                        json[i].entryTags![jdx] + '}';
+            }
+            out += tags;
+        }
+        out += compact ? '}\n' : '\n}\n\n';
+    }
     return out;
 }
 
-export { BibtexEntry };
+// Declare BibtexParser for internal use
+declare function BibtexParser(): void;

@@ -1,0 +1,282 @@
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+/* Root CSS Variables - Light Theme (Default) */
+:root {
+    --accent-color: #2563eb;
+    --text-primary: #1a1a1a;
+    --text-secondary: #666666;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --border-color: #e1e4e8;
+}
+
+/* Dark Theme Variables */
+[data-theme="dark"] {
+    --accent-color: #60a5fa;
+    --text-primary: #e2e8f0;
+    --text-secondary: #a0aec0;
+    --bg-primary: #1a202c;
+    --bg-secondary: #2d3748;
+    --border-color: #4a5568;
+}
+
+/* Body defaults */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    margin: 0;
+    padding: 0;
+}
+
+/* Headings */
+#mainContainer {
+    position: relative;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    font-family: 'Libre Baskerville', serif;
+}
+
+#mainContainer h1 {
+    font-family: 'Libre Baskerville', serif;
+    font-size: 3.5em;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--accent-color);
+    margin: 1.5em 0 0.75em 0;
+    padding-bottom: 0.3em;
+    line-height: 1.3;
+    text-align: center;
+}
+
+#mainContainer h2 {
+    font-family: 'Libre Baskerville', serif;
+    font-size: 2.6em;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #4a90e2;
+    margin: 1.3em 0 0.6em 0;
+    padding-bottom: 0.2em;
+    border-bottom: 2px solid #4a90e2;
+    line-height: 1.4;
+}
+
+#mainContainer h3 {
+    font-family: 'Libre Baskerville', serif;
+    font-size: 2em;
+    font-weight: 700;
+    color: #7bb3f0;
+    margin: 1.2em 0 0.5em 0;
+    line-height: 1.4;
+}
+
+/* Dark theme heading adjustments */
+[data-theme="dark"] #mainContainer h2 {
+    color: #6bb6ff;
+    border-bottom-color: #6bb6ff;
+}
+
+[data-theme="dark"] #mainContainer h3 {
+    color: #85c1ff;
+}
+
+/* Paragraphs */
+#mainContainer p {
+    margin: 1em 0;
+    text-align: justify;
+    line-height: 1.8;
+    font-size: 1.35em;
+    font-weight: 400;
+}
+
+/* Links */
+#mainContainer a {
+    color: var(--accent-color);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-bottom-color 0.2s ease;
+}
+
+#mainContainer a:hover {
+    border-bottom-color: var(--accent-color);
+}
+
+/* Emphasis */
+#mainContainer em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--text-primary);
+}
+
+#mainContainer strong {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Code */
+#mainContainer code {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #d73a49;
+}
+
+[data-theme="dark"] #mainContainer code {
+    color: #ff7b7b;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Code blocks */
+#mainContainer pre {
+    background: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 1em;
+    overflow-x: auto;
+    margin: 1.5em 0;
+}
+
+[data-theme="dark"] #mainContainer pre {
+    background: #2d3748;
+    border-color: #4a5568;
+}
+
+#mainContainer pre code {
+    background: none;
+    padding: 0;
+    color: var(--text-primary);
+    font-size: 1em;
+}
+
+/* Lists */
+#mainContainer ul, #mainContainer ol {
+    margin: 1em 0;
+    padding-left: 2em;
+    font-size: 1.35em;
+    line-height: 1.8;
+}
+
+#mainContainer li {
+    margin: 0.5em 0;
+    line-height: 1.8;
+}
+
+#mainContainer ul li {
+    list-style-type: disc;
+}
+
+#mainContainer ol li {
+    list-style-type: decimal;
+}
+
+/* Nested lists */
+#mainContainer ul ul, #mainContainer ol ol, #mainContainer ul ol, #mainContainer ol ul {
+    margin: 0.3em 0;
+    font-size: 1em;
+}
+
+/* Blockquotes */
+#mainContainer blockquote {
+    border-left: 4px solid var(--accent-color);
+    margin: 1.5em 0;
+    padding: 0.5em 0 0.5em 1.5em;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 1.25em;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] #mainContainer blockquote {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Tables */
+#mainContainer table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.5em 0;
+    font-size: 1em;
+}
+
+#mainContainer th, #mainContainer td {
+    border: 1px solid #ddd;
+    padding: 0.6em 1em;
+    text-align: left;
+}
+
+#mainContainer th {
+    background: #f8f9fa;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] #mainContainer th {
+    background: #2d3748;
+}
+
+[data-theme="dark"] #mainContainer th,
+[data-theme="dark"] #mainContainer td {
+    border-color: #4a5568;
+}
+
+/* Horizontal rule */
+#mainContainer hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(to right, var(--accent-color), transparent);
+    margin: 2em 0;
+}
+
+/* Images */
+#mainContainer img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 1em 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] #mainContainer img {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Math expressions */
+#mainContainer .math {
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #mainContainer h1 {
+        font-size: 2.2em;
+    }
+
+    #mainContainer h2 {
+        font-size: 1.8em;
+    }
+
+    #mainContainer h3 {
+        font-size: 1.5em;
+    }
+
+    #mainContainer p {
+        font-size: 1.1em;
+    }
+
+    #mainContainer ul, #mainContainer ol {
+        padding-left: 1.5em;
+        font-size: 1.1em;
+    }
+
+    #mainContainer table {
+        font-size: 0.9em;
+    }
+
+    #mainContainer th, #mainContainer td {
+        padding: 0.4em 0.6em;
+    }
+}

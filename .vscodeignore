@@ -1,12 +1,27 @@
+# Development files
 .vscode/**
 .vscode-test/**
-out/**/*.map
-node_modules/**
 src/**
 .gitignore
-.gitattributes
-tsconfig.json
-tslint.json
+.yarnrc
+vsc-extension-quickstart.md
+**/tsconfig*.json
+**/.eslintrc.json
 **/*.map
+node_modules/**
+.git/**
+.github/**
+
+# Build scripts
+run.ps1
+
+# Package manager files
+package-lock.json
+yarn.lock
+
+# Source TypeScript files (compiled versions in out/ and res/dist/ are included)
 **/*.ts
+
+# Keep the compiled JavaScript files
 !out/**/*.js
+!res/dist/**/*.js

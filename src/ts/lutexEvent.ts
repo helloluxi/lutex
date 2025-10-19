@@ -1,6 +1,19 @@
+// @ts-nocheck
 import LutexArticle from './lutexRenderer.js';
-import ThemeManager from './theme.js';
-import CommandLine  from './cmd.js';
+import ThemeManager from './Theme.js';
+import CommandLine  from './lutexCmd.js';
+
+// Extend Window interface to include custom properties
+declare global {
+  interface Window {
+    lutex: LutexArticle;
+    themeManager: ThemeManager;
+    lutexListenerPort?: number;
+    commandLine?: CommandLine;
+    storeNavigationHistory?: (targetElement: Element) => void;
+  }
+  function renderMathInElement(element: HTMLElement, options: any): void;
+}
 
 const themeManager = new ThemeManager();
 const lutex = new LutexArticle();
@@ -9,10 +22,20 @@ let commandLine = new CommandLine(); // Will be updated after rendering
 window.lutex = lutex;
 window.themeManager = themeManager;
 
-// Initialize theme system
-document.addEventListener('DOMContentLoaded', function () {
-    themeManager.initialize();
-});
+// Helper function to update URL parameter
+function updateUrlThemeParam(theme: string): void {
+    const url = new URL(window.location.href);
+    url.searchParams.set('m', theme);
+    window.history.replaceState({}, '', url);
+}
+
+// Initialize theme from URL param only
+const urlParams = new URLSearchParams(window.location.search);
+const themeFromUrl = urlParams.get('m') || 'dark'; // Default to dark if not specified
+themeManager.setTheme(themeFromUrl);
+if (window.lutexDefaultTheme) {
+    delete window.lutexDefaultTheme;
+}
 
 // ===== TOOLTIP FUNCTIONS =====
 // Utility functions for tooltips

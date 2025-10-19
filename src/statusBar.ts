@@ -2,21 +2,29 @@ import * as vscode from 'vscode';
 
 export class StatusBarManager {
     private statusBarItem: vscode.StatusBarItem;
-    private rendererRunning: boolean = false;
+    private texRendererRunning: boolean = false;
+    private mdRendererRunning: boolean = false;
     private listenerRunning: boolean = false;
-    private rendererPort: number | null = null;
+    private texRendererPort: number | null = null;
+    private mdRendererPort: number | null = null;
     private listenerPort: number | null = null;
 
     constructor() {
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-        this.statusBarItem.command = 'lutex-ext.toggleStatus';
+        this.statusBarItem.command = 'lutex-ext.showStatus';
         this.updateStatusBar();
         this.statusBarItem.show();
     }
 
-    public setRendererStatus(running: boolean, port: number | null = null): void {
-        this.rendererRunning = running;
-        this.rendererPort = port;
+    public setTexRendererStatus(running: boolean, port: number | null = null): void {
+        this.texRendererRunning = running;
+        this.texRendererPort = port;
+        this.updateStatusBar();
+    }
+
+    public setMdRendererStatus(running: boolean, port: number | null = null): void {
+        this.mdRendererRunning = running;
+        this.mdRendererPort = port;
         this.updateStatusBar();
     }
 
@@ -27,16 +35,37 @@ export class StatusBarManager {
     }
 
     private updateStatusBar(): void {
-        const rendererIcon = this.rendererRunning ? '$(preview)' : '$(circle-slash)';
-        const listenerIcon = this.listenerRunning ? '$(radio-tower)' : '$(circle-slash)';
+        const icons: string[] = [];
         
-        let text = `${rendererIcon} ${listenerIcon} LuTeX`;
-        let tooltip = 'LuTeX Status:\n';
+        // Add icons based on running services
+        if (this.texRendererRunning) {
+            icons.push('$(file-code)'); // LaTeX/LuTeX icon
+        }
+        if (this.mdRendererRunning) {
+            icons.push('$(markdown)'); // Markdown icon
+        }
+        if (this.listenerRunning) {
+            icons.push('$(radio-tower)'); // Listener icon
+        }
         
-        if (this.rendererRunning && this.rendererPort) {
-            tooltip += `• Renderer: Running on port ${this.rendererPort}\n`;
+        // If nothing is running, show inactive icon
+        if (icons.length === 0) {
+            icons.push('$(circle-slash)');
+        }
+        
+        const text = `${icons.join(' ')} LuTeX`;
+        let tooltip = 'LuTeX Status (click for options):\n';
+        
+        if (this.texRendererRunning && this.texRendererPort) {
+            tooltip += `• LuTeX Renderer: Running on port ${this.texRendererPort}\n`;
         } else {
-            tooltip += '• Renderer: Stopped\n';
+            tooltip += '• LuTeX Renderer: Stopped\n';
+        }
+        
+        if (this.mdRendererRunning && this.mdRendererPort) {
+            tooltip += `• Markdown Renderer: Running on port ${this.mdRendererPort}\n`;
+        } else {
+            tooltip += '• Markdown Renderer: Stopped\n';
         }
         
         if (this.listenerRunning && this.listenerPort) {

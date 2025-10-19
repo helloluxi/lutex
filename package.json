@@ -32,33 +32,23 @@
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.launchRenderer",
-        "title": "Launch Renderer",
+        "command": "lutex-ext.launchLutexWithListener",
+        "title": "Launch LuTeX Renderer with Listener",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.closeRenderer",
-        "title": "Close Renderer",
+        "command": "lutex-ext.launchMarkdownWithListener",
+        "title": "Launch Markdown Renderer with Listener",
         "category": "LuTeX"
       },
       {
         "command": "lutex-ext.launchListener",
-        "title": "Launch Listener",
+        "title": "Launch Listener Only",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.closeListener",
-        "title": "Close Listener",
-        "category": "LuTeX"
-      },
-      {
-        "command": "lutex-ext.launch",
-        "title": "Launch (Both)",
-        "category": "LuTeX"
-      },
-      {
-        "command": "lutex-ext.close",
-        "title": "Close (Both)",
+        "command": "lutex-ext.closeAll",
+        "title": "Close All",
         "category": "LuTeX"
       },
       {
@@ -99,12 +89,17 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "npm run compile:extension && npm run compile:res",
+    "compile:extension": "tsc -p ./tsconfig.json",
+    "compile:res": "tsc -p ./tsconfig.res.json",
+    "watch": "npm run watch:extension & npm run watch:res",
+    "watch:extension": "tsc -watch -p ./tsconfig.json",
+    "watch:res": "tsc -watch -p ./tsconfig.res.json",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
-    "package": "vsce package"
+    "package": "vsce package",
+    "clean": "rimraf out res/dist"
   },
   "devDependencies": {
     "@types/node": "^16.11.7",

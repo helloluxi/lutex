@@ -6,27 +6,36 @@ import * as vscode from 'vscode';
  */
 
 /**
- * Find an available random port between 1024 and 65535
+ * Find an available port starting from 12023, trying up to 100 consecutive ports
  * @returns Promise<number> - The available port
+ * @throws Error if no available port found after 100 attempts
  */
 export function findAvailablePort(): Promise<number> {
-    return new Promise((resolve) => {
-        const tryPort = () => {
-            // Generate a random port between 1024 and 65535
-            const port = Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024;
+    return new Promise((resolve, reject) => {
+        const startPort = 12023;
+        const maxAttempts = 100;
+        let attemptCount = 0;
+
+        const tryPort = (port: number) => {
+            if (attemptCount >= maxAttempts) {
+                reject(new Error(`No available port found after ${maxAttempts} attempts (tried ports ${startPort}-${startPort + maxAttempts - 1})`));
+                return;
+            }
+
+            attemptCount++;
             const testServer = http.createServer();
-            
+
             testServer.listen(port, 'localhost', () => {
                 testServer.close(() => {
                     resolve(port);
                 });
             }).on('error', () => {
-                // On any error, try again with a new random port
-                tryPort();
+                // On error, try the next port
+                tryPort(port + 1);
             });
         };
-        
-        tryPort();
+
+        tryPort(startPort);
     });
 }
 
