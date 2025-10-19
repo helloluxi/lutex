@@ -111,7 +111,11 @@ body {
 
 #mainContainer strong {
     font-weight: 700;
-    color: var(--text-primary);
+    color: #2563eb;
+}
+
+[data-theme="dark"] #mainContainer strong {
+    color: #60a5fa;
 }
 
 /* Code */

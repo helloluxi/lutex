@@ -47,6 +47,12 @@ export const renderMarkdown = (function() {
         // Process inline code: `code`
         processedLine = processedLine.replace(/`([^`]+)`/g, '<code>$1</code>');
         
+        // Process markdown links: [text](url)
+        processedLine = processedLine.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+        
+        // Process strong text: **text**
+        processedLine = processedLine.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        
         // Process URLs: automatically link https:// URLs
         processedLine = processedLine.replace(/(https:\/\/[^\s<>]+)/g, '<a href="$1" target="_blank">$1</a>');
         

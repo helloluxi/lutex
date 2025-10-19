@@ -1,43 +1,37 @@
 # LuTeX VSCode Extension
 
-Xi Lu's Real-time interactive LaTeX and Markdown HTML renderers.
+Real-time interactive LaTeX and Markdown renderers in HTML.
 
-## Features
-
-- **LuTeX Renderer**: Real-time LaTeX rendering with interactive two-way navigation
-- **Markdown Renderer**: Real-time Markdown rendering with interactive features
-- **Listener**: Enables two-way communication between VS Code and renderers
-
-## Usage
-
-### Quick Start
+## Getting Started
 
 1. Run `run.ps1` to build and install the extension
-2. Open the command palette (Ctrl+Shift+P / Cmd+Shift+P)
-3. Choose one of the following commands:
-   - **LuTeX: Launch LuTeX Renderer with Listener** - For LaTeX files (requires `main.tex` in workspace)
-   - **LuTeX: Launch Markdown Renderer with Listener** - For Markdown files (requires `main.md` in workspace)
-   - **LuTeX: Launch Listener Only** - Start listener without renderer
-   - **LuTeX: Close All** - Stop all running services
+2. Open a workspace with `main.tex` (for LaTeX) or `main.md` (for Markdown)
+3. Open command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+4. Run:
+   - `LuTeX: Launch LuTeX Renderer with Listener` for LaTeX
+   - `LuTeX: Launch Markdown Renderer with Listener` for Markdown
 
-### Commands
+## Commands
 
-- **Launch LuTeX Renderer with Listener**: Starts the LaTeX renderer and listener, opens browser
-- **Launch Markdown Renderer with Listener**: Starts the Markdown renderer and listener, opens browser
-- **Launch Listener Only**: Starts only the listener server for external renderer integration
-- **Close All**: Stops all running renderers and listener
-- **Jump to HTML Element**: Jump to the HTML element corresponding to the current line in VS Code
+| Command | Description |
+|---------|-------------|
+| **Launch LuTeX Renderer with Listener** | Start LaTeX preview and open in browser |
+| **Launch Markdown Renderer with Listener** | Start Markdown preview and open in browser |
+| **Launch Listener Only** | Start background service without opening preview |
+| **Close All** | Stop all running services |
+| **Jump to HTML Element** | Scroll preview to match current editor line |
 
-### Interactive Features
+## Keyboard Shortcuts
 
-- **Editor to Renderer**: Run **LuTeX: Jump to HTML Element** to scroll the renderer to the current line
-- **Renderer to Editor**: Double-click any HTML element in the renderer to jump to the corresponding line in VS Code
-- **Auto-refresh**: The renderer automatically refreshes when you save `.tex` or `.md` files
+**In Renderer Window:**
+- **M** - Toggle light/dark theme
+- **Double-click** - Jump to corresponding line in editor
 
-### Status Bar
+**In VS Code:**
+- Run `Jump to HTML Element` command to scroll preview to current line, you may bind custom key
 
-Click the LuTeX icon in the status bar to quickly access all commands and see which services are running.
+## How It Works
 
-### Custom Keybindings
-
-You may set custom keybindings for any command in VS Code's keyboard shortcuts settings.
+- **Editor → Preview**: Use the `Jump to HTML Element` command to scroll the preview to your current cursor position
+- **Preview → Editor**: Double-click any element in the preview to jump to that line in your editor
+- **Auto-sync**: Save your `.tex` or `.md` file to automatically refresh the preview
