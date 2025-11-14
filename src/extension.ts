@@ -6,9 +6,10 @@ import { ListenerServer } from './listenerServer';
 import { TexServer } from './texServer';
 import { MdServer } from './mdServer';
 import { SdServer } from './sdServer';
-import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings } from './settings';
+import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
+import { generateSlidePDF } from './slidesToPdf';
 
 export function activate(context: vscode.ExtensionContext) {
     // Create a dedicated output channel for LuTeX
@@ -399,6 +400,176 @@ export function activate(context: vscode.ExtensionContext) {
         listenerServer.notifyScroll(fileName, lineNumber);
     });
 
+    // Export Slides to PDF
+    const exportSlidesToPdfCommand = vscode.commands.registerCommand('lutex-ext.exportSlidesToPdf', async () => {
+        try {
+            // Check if slides renderer is running
+            if (!slidesRendererServer.isRunning()) {
+                vscode.window.showErrorMessage('Slides renderer is not running. Please launch slides first.');
+                return;
+            }
+
+            const port = slidesRendererServer.getPort();
+            if (!port) {
+                vscode.window.showErrorMessage('Cannot determine slides server port.');
+                return;
+            }
+
+            // Ask user for resolution
+            const resolutionOptions = [
+                { label: '1440x1080 (Default 4:3)', width: 1440, height: 1080 },
+                { label: '1920x1080 (Full HD 16:9)', width: 1920, height: 1080 },
+                { label: '1280x720 (HD 16:9)', width: 1280, height: 720 },
+                { label: '1600x1200 (4:3)', width: 1600, height: 1200 },
+                { label: 'Custom...', width: 0, height: 0 }
+            ];
+
+            const selectedResolution = await vscode.window.showQuickPick(
+                resolutionOptions.map(opt => opt.label),
+                {
+                    placeHolder: 'Select PDF resolution',
+                    title: 'Export Slides to PDF'
+                }
+            );
+
+            if (!selectedResolution) {
+                return;
+            }
+
+            let width: number;
+            let height: number;
+
+            if (selectedResolution === 'Custom...') {
+                // Ask for custom dimensions
+                const dimensionInput = await vscode.window.showInputBox({
+                    prompt: 'Enter resolution (e.g., 1920x1080)',
+                    placeHolder: '1920x1080',
+                    validateInput: (value) => {
+                        const match = value.match(/^(\d+)[x*](\d+)$/);
+                        if (!match) {
+                            return 'Invalid format. Use: widthxheight (e.g., 1920x1080)';
+                        }
+                        return null;
+                    }
+                });
+
+                if (!dimensionInput) {
+                    return;
+                }
+
+                const match = dimensionInput.match(/^(\d+)[x*](\d+)$/);
+                if (!match) {
+                    return;
+                }
+
+                width = parseInt(match[1], 10);
+                height = parseInt(match[2], 10);
+            } else {
+                const selected = resolutionOptions.find(opt => opt.label === selectedResolution);
+                if (!selected) {
+                    return;
+                }
+                width = selected.width;
+                height = selected.height;
+            }
+
+            // Ask user for save location
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('No workspace folder found.');
+                return;
+            }
+
+            const defaultPath = vscode.Uri.joinPath(workspaceFolder.uri, 'out', 'slides.pdf');
+            const saveUri = await vscode.window.showSaveDialog({
+                defaultUri: defaultPath,
+                filters: {
+                    'PDF Files': ['pdf']
+                },
+                saveLabel: 'Export PDF',
+                title: 'Save Slides as PDF'
+            });
+
+            if (!saveUri) {
+                return;
+            }
+
+            outputChannel.appendLine(`[LuTeX] Starting PDF export: ${width}x${height} to ${saveUri.fsPath}`);
+            
+            // Show progress notification
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Exporting Slides to PDF',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: 'Initializing...' });
+
+                // Build the slides URL
+                const editor = vscode.window.activeTextEditor;
+                let markdownFileName = 'main.md';
+                
+                if (editor && editor.document.languageId === 'markdown') {
+                    if (workspaceFolder) {
+                        const relativePath = path.relative(workspaceFolder.uri.fsPath, editor.document.uri.fsPath);
+                        markdownFileName = relativePath.replace(/\\/g, '/');
+                    }
+                }
+
+                const params = new URLSearchParams();
+                params.append('f', markdownFileName);
+                if (listenerServer.isRunning()) {
+                    const listenerPort = listenerServer.getPort();
+                    if (listenerPort) {
+                        params.append('o', listenerPort.toString());
+                    }
+                }
+
+                const url = `http://localhost:${port}?${params.toString()}`;
+
+                progress.report({ message: 'Generating PDF...' });
+
+                // Get Chrome path from settings
+                const chromePath = getChromePathFromSettings();
+
+                try {
+                    const outputPath = await generateSlidePDF({
+                        url,
+                        width,
+                        height,
+                        outputPath: saveUri.fsPath,
+                        executablePath: chromePath
+                    }, outputChannel);
+
+                    progress.report({ message: 'Complete!' });
+                    
+                    const message = outputPath.includes('Note:') 
+                        ? 'PDF exported (single page). For multi-slide PDFs, install: npm install -g puppeteer'
+                        : 'PDF exported successfully';
+                    
+                    vscode.window.showInformationMessage(
+                        `${message}: ${path.basename(outputPath)}`,
+                        'Open File',
+                        'Show in Explorer'
+                    ).then(selection => {
+                        if (selection === 'Open File') {
+                            vscode.env.openExternal(vscode.Uri.file(outputPath));
+                        } else if (selection === 'Show in Explorer') {
+                            vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(outputPath));
+                        }
+                    });
+                } catch (error) {
+                    const errorMsg = error instanceof Error ? error.message : String(error);
+                    vscode.window.showErrorMessage(`Failed to export PDF: ${errorMsg}`);
+                    outputChannel.appendLine(`[LuTeX] Export error: ${errorMsg}`);
+                }
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to export slides to PDF: ${errorMessage}`);
+            outputChannel.appendLine(`[LuTeX] Export slides to PDF error: ${errorMessage}`);
+        }
+    });
+
     // Status bar click command - show quick pick menu
     const showStatusCommand = vscode.commands.registerCommand('lutex-ext.showStatus', async () => {
         const options: vscode.QuickPickItem[] = [];
@@ -526,6 +697,7 @@ export function activate(context: vscode.ExtensionContext) {
         launchListenerCommand,
         closeAllCommand,
         jumpToHtmlCommand,
+        exportSlidesToPdfCommand,
         showStatusCommand,
         statusBar
     );

@@ -17,13 +17,14 @@ export function getThemeFromSettings(): string {
 
 export function getKatexMacrosFromSettings(): { [key: string]: string } {
     const config = vscode.workspace.getConfiguration('lutex-ext');
-    const defaultMacros = {
-        "\\ket": "\\lvert #1 \\rangle",
-        "\\bra": "\\langle #1 \\rvert",
-        "\\ip": "\\langle #1 | #2 \\rangle",
-        "\\dyad": "\\ket{#1} \\bra{#2}"
-    };
-    return config.get<{ [key: string]: string }>('katexMacros') ?? defaultMacros;
+    const macros = config.get<{ [key: string]: string }>('katexMacros');
+    return macros || {};
+}
+
+export function getChromePathFromSettings(): string | undefined {
+    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const chromePath = config.get<string>('chromePath');
+    return chromePath && chromePath.trim() !== '' ? chromePath.trim() : undefined;
 }
 
 // Backward compatibility

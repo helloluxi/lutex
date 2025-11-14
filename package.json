@@ -11,7 +11,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:latex"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -60,6 +60,12 @@
         "command": "lutex-ext.jumpToHtml",
         "title": "Jump to HTML Element",
         "category": "LuTeX"
+      },
+      {
+        "command": "lutex-ext.exportSlidesToPdf",
+        "title": "Export Slides to PDF",
+        "category": "LuTeX",
+        "enablement": "lutexSlidesRendererActive"
       }
     ],
     "configuration": {
@@ -97,6 +103,12 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "lutex-ext.chromePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Chrome/Chromium executable for PDF generation. Leave empty to auto-detect. Example: C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "scope": "machine"
         }
       }
     }
@@ -127,5 +139,9 @@
     "@vscode/vsce": "^2.15.0",
     "eslint": "^8.13.0",
     "typescript": "^5.9.2"
+  },
+  "optionalDependencies": {
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.11.2"
   }
 }
