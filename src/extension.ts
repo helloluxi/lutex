@@ -3,8 +3,9 @@ import * as path from 'path';
 import { registerFileCommands } from './fileCommands';
 import { registerBibtexCommands } from './bibtexCommands';
 import { ListenerServer } from './listenerServer';
-import { TexRendererServer } from './texRendererServer';
-import { MdRendererServer } from './mdRendererServer';
+import { TexServer } from './texServer';
+import { MdServer } from './mdServer';
+import { SdServer } from './sdServer';
 import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
@@ -22,8 +23,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize servers
     const listenerServer = new ListenerServer(outputChannel);
-    const texRendererServer = new TexRendererServer(outputChannel, context.extensionPath);
-    const mdRendererServer = new MdRendererServer(outputChannel, context.extensionPath);
+    const texRendererServer = new TexServer(outputChannel, context.extensionPath);
+    const mdRendererServer = new MdServer(outputChannel, context.extensionPath);
+    const slidesRendererServer = new SdServer(outputChannel, context.extensionPath);
     
     // Initialize status bar
     const statusBar = new StatusBarManager();
@@ -31,6 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize context keys for renderer states
     vscode.commands.executeCommand('setContext', 'lutexRendererActive', false);
     vscode.commands.executeCommand('setContext', 'lutexMarkdownRendererActive', false);
+    vscode.commands.executeCommand('setContext', 'lutexSlidesRendererActive', false);
 
     // Set up file watchers to trigger refresh
     const texFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.tex');
@@ -42,7 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
     
     const mdFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.md');
     mdFileWatcher.onDidChange(() => {
-        if (listenerServer.isRunning() && mdRendererServer.isRunning()) {
+        if (listenerServer.isRunning() && (mdRendererServer.isRunning() || slidesRendererServer.isRunning())) {
             listenerServer.notifyRefresh();
         }
     });
@@ -220,6 +223,92 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Launch Slides Renderer with Listener
+    const launchSlidesWithListenerCommand = vscode.commands.registerCommand('lutex-ext.launchSlidesWithListener', async () => {
+        try {
+            // Get the active markdown file
+            const editor = vscode.window.activeTextEditor;
+            let markdownFileName = 'main.md'; // default
+            
+            if (editor && editor.document.languageId === 'markdown') {
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (workspaceFolder) {
+                    const relativePath = path.relative(workspaceFolder.uri.fsPath, editor.document.uri.fsPath);
+                    markdownFileName = relativePath.replace(/\\/g, '/'); // Use forward slashes for URL
+                }
+            }
+
+            // Start listener first if not already running
+            if (!listenerServer.isRunning()) {
+                const configuredListenerPort = getListenerPortFromSettings();
+                const listenerPort = configuredListenerPort > 0 ? configuredListenerPort : undefined;
+                const listenerServerPort = await listenerServer.start(listenerPort);
+                statusBar.setListenerStatus(true, listenerServerPort);
+                outputChannel.appendLine(`[LuTeX] Listener started on port ${listenerServerPort}`);
+            }
+
+            // Check if slides renderer is already running
+            if (slidesRendererServer.isRunning()) {
+                const port = slidesRendererServer.getPort();
+                outputChannel.appendLine(`[LuTeX] Slides renderer already running on port ${port}, opening browser`);
+                
+                // Build URL with parameters
+                let url = `http://localhost:${port}`;
+                const params = new URLSearchParams();
+                
+                // Add markdown file parameter
+                params.append('f', markdownFileName);
+                
+                if (listenerServer.isRunning()) {
+                    const listenerPort = listenerServer.getPort();
+                    params.append('o', listenerPort!.toString());
+                }
+                
+                const queryString = params.toString();
+                if (queryString) {
+                    url += `?${queryString}`;
+                }
+                
+                vscode.env.openExternal(vscode.Uri.parse(url));
+                return;
+            }
+
+            // Start slides renderer
+            const configuredPort = getRendererPortFromSettings();
+            const port = configuredPort > 0 ? configuredPort : undefined;
+            const serverPort = await slidesRendererServer.start(port);
+            
+            vscode.commands.executeCommand('setContext', 'lutexSlidesRendererActive', true);
+            statusBar.setSlidesRendererStatus(true, serverPort);
+            
+            // Build URL with parameters
+            let url = `http://localhost:${serverPort}`;
+            const params = new URLSearchParams();
+            
+            // Add markdown file parameter
+            params.append('f', markdownFileName);
+            
+            if (listenerServer.isRunning()) {
+                const listenerPort = listenerServer.getPort();
+                params.append('o', listenerPort!.toString());
+            }
+            
+            const queryString = params.toString();
+            if (queryString) {
+                url += `?${queryString}`;
+            }
+            
+            // Automatically open browser
+            vscode.env.openExternal(vscode.Uri.parse(url));
+            outputChannel.appendLine(`[LuTeX] Slides renderer started on port ${serverPort} with listener integration (file: ${markdownFileName})`);
+            
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to start Slides renderer: ${errorMessage}`);
+            outputChannel.appendLine(`[LuTeX] Launch Slides renderer error: ${errorMessage}`);
+        }
+    });
+
     // Launch Listener Only
     const launchListenerCommand = vscode.commands.registerCommand('lutex-ext.launchListener', async () => {
         try {
@@ -263,6 +352,14 @@ export function activate(context: vscode.ExtensionContext) {
             statusBar.setMdRendererStatus(false);
             stopped.push('Markdown renderer');
             outputChannel.appendLine('[LuTeX] Markdown renderer stopped');
+        }
+        
+        if (slidesRendererServer.isRunning()) {
+            slidesRendererServer.stop();
+            vscode.commands.executeCommand('setContext', 'lutexSlidesRendererActive', false);
+            statusBar.setSlidesRendererStatus(false);
+            stopped.push('Slides renderer');
+            outputChannel.appendLine('[LuTeX] Slides renderer stopped');
         }
         
         if (listenerServer.isRunning()) {
@@ -335,6 +432,20 @@ export function activate(context: vscode.ExtensionContext) {
             });
         }
         
+        if (!slidesRendererServer.isRunning()) {
+            options.push({
+                label: '$(play) Launch Slides Renderer with Listener',
+                description: 'Start Slides renderer and listener',
+                detail: 'Opens a browser with the Slides renderer'
+            });
+        } else {
+            options.push({
+                label: '$(debug-stop) Stop Slides Renderer',
+                description: `Currently running on port ${slidesRendererServer.getPort()}`,
+                detail: 'Stop the Slides renderer'
+            });
+        }
+        
         if (!listenerServer.isRunning()) {
             options.push({
                 label: '$(radio-tower) Launch Listener Only',
@@ -350,7 +461,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
         
         // Always show close all if anything is running
-        if (texRendererServer.isRunning() || mdRendererServer.isRunning() || listenerServer.isRunning()) {
+        if (texRendererServer.isRunning() || mdRendererServer.isRunning() || slidesRendererServer.isRunning() || listenerServer.isRunning()) {
             options.push({
                 label: '$(trash) Close All',
                 description: 'Stop all running services',
@@ -371,6 +482,8 @@ export function activate(context: vscode.ExtensionContext) {
             await vscode.commands.executeCommand('lutex-ext.launchLutexWithListener');
         } else if (selection.label.includes('Markdown Renderer with Listener')) {
             await vscode.commands.executeCommand('lutex-ext.launchMarkdownWithListener');
+        } else if (selection.label.includes('Slides Renderer with Listener')) {
+            await vscode.commands.executeCommand('lutex-ext.launchSlidesWithListener');
         } else if (selection.label.includes('Listener Only')) {
             await vscode.commands.executeCommand('lutex-ext.launchListener');
         } else if (selection.label.includes('Stop LuTeX Renderer')) {
@@ -387,6 +500,13 @@ export function activate(context: vscode.ExtensionContext) {
                 statusBar.setMdRendererStatus(false);
                 outputChannel.appendLine('[LuTeX] Markdown renderer stopped');
             }
+        } else if (selection.label.includes('Stop Slides Renderer')) {
+            if (slidesRendererServer.isRunning()) {
+                slidesRendererServer.stop();
+                vscode.commands.executeCommand('setContext', 'lutexSlidesRendererActive', false);
+                statusBar.setSlidesRendererStatus(false);
+                outputChannel.appendLine('[LuTeX] Slides renderer stopped');
+            }
         } else if (selection.label.includes('Stop Listener')) {
             if (listenerServer.isRunning()) {
                 listenerServer.stop();
@@ -402,6 +522,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         launchLutexWithListenerCommand,
         launchMarkdownWithListenerCommand,
+        launchSlidesWithListenerCommand,
         launchListenerCommand,
         closeAllCommand,
         jumpToHtmlCommand,
@@ -415,8 +536,10 @@ export function activate(context: vscode.ExtensionContext) {
             listenerServer.stop();
             texRendererServer.stop();
             mdRendererServer.stop();
+            slidesRendererServer.stop();
             vscode.commands.executeCommand('setContext', 'lutexRendererActive', false);
             vscode.commands.executeCommand('setContext', 'lutexMarkdownRendererActive', false);
+            vscode.commands.executeCommand('setContext', 'lutexSlidesRendererActive', false);
             outputChannel.dispose();
         }
     });

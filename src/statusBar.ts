@@ -4,9 +4,11 @@ export class StatusBarManager {
     private statusBarItem: vscode.StatusBarItem;
     private texRendererRunning: boolean = false;
     private mdRendererRunning: boolean = false;
+    private slidesRendererRunning: boolean = false;
     private listenerRunning: boolean = false;
     private texRendererPort: number | null = null;
     private mdRendererPort: number | null = null;
+    private slidesRendererPort: number | null = null;
     private listenerPort: number | null = null;
 
     constructor() {
@@ -28,6 +30,12 @@ export class StatusBarManager {
         this.updateStatusBar();
     }
 
+    public setSlidesRendererStatus(running: boolean, port: number | null = null): void {
+        this.slidesRendererRunning = running;
+        this.slidesRendererPort = port;
+        this.updateStatusBar();
+    }
+
     public setListenerStatus(running: boolean, port: number | null = null): void {
         this.listenerRunning = running;
         this.listenerPort = port;
@@ -43,6 +51,9 @@ export class StatusBarManager {
         }
         if (this.mdRendererRunning) {
             icons.push('$(markdown)'); // Markdown icon
+        }
+        if (this.slidesRendererRunning) {
+            icons.push('$(preview)'); // Slides icon
         }
         if (this.listenerRunning) {
             icons.push('$(radio-tower)'); // Listener icon
@@ -66,6 +77,12 @@ export class StatusBarManager {
             tooltip += `• Markdown Renderer: Running on port ${this.mdRendererPort}\n`;
         } else {
             tooltip += '• Markdown Renderer: Stopped\n';
+        }
+        
+        if (this.slidesRendererRunning && this.slidesRendererPort) {
+            tooltip += `• Slides Renderer: Running on port ${this.slidesRendererPort}\n`;
+        } else {
+            tooltip += '• Slides Renderer: Stopped\n';
         }
         
         if (this.listenerRunning && this.listenerPort) {

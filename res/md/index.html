@@ -18,7 +18,7 @@
 
     <script type="module">
         import ThemeManager from '/dist/Theme.js';
-        import { renderMarkdownWithMath } from '/dist/MarkdownRenderer.js';
+        import { renderMarkdownWithMath } from '/dist/mdRenderer.js';
 
         const themeManager = new ThemeManager();
 
@@ -37,6 +37,14 @@
             delete window.lutexDefaultTheme;
         }
 
+        // Get KaTeX macros from configuration or use defaults
+        const katexMacros = window.lutexKatexMacros || {
+            "\\ket": "\\lvert #1 \\rangle",
+            "\\bra": "\\langle #1 \\rvert",
+            "\\ip": "\\langle #1 | #2 \\rangle",
+            "\\dyad": "\\ket{#1} \\bra{#2}"
+        };
+
         async function loadMarkdown() {
             const markdownFile = window.lutexMarkdownFile || 'main.md';
             try {
@@ -54,7 +62,7 @@
             const contentElement = document.getElementById('mainContainer');
             try {
                 const markdown = await loadMarkdown();
-                await renderMarkdownWithMath(markdown, contentElement);
+                await renderMarkdownWithMath(markdown, contentElement, katexMacros);
             } catch (error) {
                 console.error('Error loading content:', error);
                 contentElement.innerHTML = `
@@ -90,6 +98,9 @@
                         const scrollY = window.scrollY;
                         localStorage.setItem('mdScrollPosition', scrollY.toString());
                         location.reload();
+                    } else if (data.type === 'close') {
+                        // Server is shutting down, close the window/tab
+                        window.close();
                     } else if (data.type === 'scroll') {
                         // Handle scroll requests (for future use)
                         console.log('Scroll event received:', data);
@@ -98,7 +109,6 @@
                     console.error('Error processing event:', error);
                 }
             });
-            console.log(`Auto-refresh enabled on listener port ${listenerPort}`);
         }
 
         // Restore scroll position after page load

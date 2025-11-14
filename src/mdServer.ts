@@ -2,10 +2,10 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { jumpToLine } from './fileNavigation';
-import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse } from './tools';
+import { findAvailablePort, addCorsHeaders, handleOptionsRequest } from './tools';
+import { getKatexMacrosFromSettings } from './settings';
 
-export class TexRendererServer {
+export class MdServer {
     private server: http.Server;
     private outputChannel: vscode.OutputChannel;
     private resourcesPath: string;
@@ -14,7 +14,7 @@ export class TexRendererServer {
 
     constructor(outputChannel: vscode.OutputChannel, extensionPath: string) {
         this.outputChannel = outputChannel;
-        this.resourcesPath = path.join(extensionPath, 'res', 'tex');
+        this.resourcesPath = path.join(extensionPath, 'res', 'md');
         this.distResourcesPath = path.join(extensionPath, 'res', 'dist');
         this.server = this.createServer();
     }
@@ -22,7 +22,7 @@ export class TexRendererServer {
     private createServer(): http.Server {
         return http.createServer((req, res) => {
             // Add CORS headers
-            addCorsHeaders(res, 'GET, POST, OPTIONS');
+            addCorsHeaders(res, 'GET, OPTIONS');
 
             // Handle preflight requests
             if (req.method === 'OPTIONS') {
@@ -30,47 +30,12 @@ export class TexRendererServer {
                 return;
             }
 
-            if (req.method === 'POST') {
-                this.handlePostRequest(req, res);
-            } else if (req.method === 'GET') {
+            if (req.method === 'GET') {
                 this.handleGetRequest(req, res);
             } else {
-                this.outputChannel.appendLine(`[HTTP Server] Method not allowed: ${req.method}`);
+                this.outputChannel.appendLine(`[Markdown Server] Method not allowed: ${req.method}`);
                 res.writeHead(405, { 'Content-Type': 'text/plain' });
                 res.end('Method not allowed');
-            }
-        });
-    }
-
-    private handlePostRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-        let body = '';
-        req.on('data', chunk => {
-            body += chunk.toString();
-        });
-        req.on('end', () => {
-            try {
-                const data = JSON.parse(body);
-                const { file, line } = data;
-                this.outputChannel.appendLine(`[HTTP Server] Received jump request { file: ${file}, line: ${line} }`);
-                
-                const lineNumber = parseLineNumber(line, res, this.outputChannel);
-                if (lineNumber === null) return;
-                
-                if (file && typeof file === 'string' && lineNumber > 0) {
-                    jumpToLine(file, lineNumber, this.outputChannel);
-                    res.writeHead(200, { 'Content-Type': 'text/plain' });
-                    res.end('Success');
-                } else {
-                    const errorMsg = 'Invalid request format. Expected JSON with file (string) and line (number > 0) properties.';
-                    this.outputChannel.appendLine(`[HTTP Server] Error: ${errorMsg}`);
-                    res.writeHead(400, { 'Content-Type': 'text/plain' });
-                    res.end(errorMsg);
-                }
-            } catch (error) {
-                const errorMsg = `Error processing HTTP data: ${error}`;
-                this.outputChannel.appendLine(`[HTTP Server] ${errorMsg}`);
-                res.writeHead(500, { 'Content-Type': 'text/plain' });
-                res.end('Internal server error');
             }
         });
     }
@@ -97,15 +62,16 @@ export class TexRendererServer {
         let filePath: string;
         
         if (pathname === '/' || pathname === '/index.html') {
-            // Serve the main HTML file with potential modifications for listener port and theme
+            // Serve the main HTML file with potential modifications for theme and listener port
             filePath = path.join(this.resourcesPath, 'index.html');
             
-            // Get URL parameters (using 'o' for port and 'm' for theme mode)
+            // Get URL parameters (using 'f' for file, 'o' for listener port, and 'm' for theme mode)
+            const markdownFile = url.searchParams.get('f');
             const listenerPort = url.searchParams.get('o');
             const themeMode = url.searchParams.get('m');
             
-            if (listenerPort || themeMode) {
-                this.serveModifiedIndexHtml(filePath, listenerPort, themeMode, res);
+            if (markdownFile || listenerPort || themeMode) {
+                this.serveModifiedIndexHtml(filePath, markdownFile, listenerPort, themeMode, res);
                 return;
             }
         } else if (pathname.startsWith('/dist/')) {
@@ -115,8 +81,8 @@ export class TexRendererServer {
         } else if (pathname.endsWith('.css')) {
             // Serve CSS files from resources directory
             filePath = path.join(this.resourcesPath, pathname.substring(1));
-        } else if (pathname === '/main.tex' || pathname.endsWith('.tex') || pathname.endsWith('.bib')) {
-            // Serve LaTeX files from the workspace
+        } else if (pathname === '/main.md' || pathname.endsWith('.md')) {
+            // Serve markdown files from the workspace
             const fileName = pathname.startsWith('/') ? pathname.substring(1) : pathname;
             filePath = path.join(workspaceFolder.uri.fsPath, fileName);
         } else {
@@ -127,9 +93,9 @@ export class TexRendererServer {
 
         // Check if file exists
         if (!fs.existsSync(filePath)) {
-            if (pathname === '/main.tex') {
+            if (pathname === '/main.md') {
                 res.writeHead(404, { 'Content-Type': 'text/plain' });
-                res.end('main.tex not found in workspace. Please ensure your LaTeX project has a main.tex file.');
+                res.end('main.md not found in workspace. Please ensure your workspace has a main.md file.');
                 return;
             }
             res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -147,19 +113,21 @@ export class TexRendererServer {
             case '.js':
                 contentType = 'application/javascript';
                 break;
+            case '.ts':
+                contentType = 'application/typescript';
+                break;
             case '.css':
                 contentType = 'text/css';
                 break;
-            case '.tex':
-            case '.bib':
-                contentType = 'text/plain';
+            case '.md':
+                contentType = 'text/markdown';
                 break;
         }
 
         // Read and serve the file
         fs.readFile(filePath, (err, data) => {
             if (err) {
-                this.outputChannel.appendLine(`[HTTP Server] Error reading file ${filePath}: ${err.message}`);
+                this.outputChannel.appendLine(`[Markdown Server] Error reading file ${filePath}: ${err.message}`);
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('Internal server error');
                 return;
@@ -170,17 +138,25 @@ export class TexRendererServer {
         });
     }
 
-    private serveModifiedIndexHtml(filePath: string, listenerPort: string | null, themeMode: string | null, res: http.ServerResponse): void {
+    private serveModifiedIndexHtml(filePath: string, markdownFile: string | null, listenerPort: string | null, themeMode: string | null, res: http.ServerResponse): void {
         fs.readFile(filePath, 'utf8', (err, data) => {
             if (err) {
-                this.outputChannel.appendLine(`[Renderer Server] Error reading file ${filePath}: ${err.message}`);
+                this.outputChannel.appendLine(`[Markdown Server] Error reading file ${filePath}: ${err.message}`);
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('Internal server error');
                 return;
             }
 
+            // Get KaTeX macros from settings
+            const katexMacros = getKatexMacrosFromSettings();
+
             // Build configuration script
             let configScript = '<script>\n';
+            
+            if (markdownFile) {
+                configScript += `        // Markdown file configuration\n`;
+                configScript += `        window.lutexMarkdownFile = '${markdownFile}';\n`;
+            }
             
             if (listenerPort) {
                 configScript += `        // Listener port configuration\n`;
@@ -191,6 +167,10 @@ export class TexRendererServer {
                 configScript += `        // Theme mode configuration\n`;
                 configScript += `        window.lutexDefaultTheme = '${themeMode}';\n`;
             }
+            
+            // Add KaTeX macros configuration
+            configScript += `        // KaTeX macros configuration\n`;
+            configScript += `        window.lutexKatexMacros = ${JSON.stringify(katexMacros)};\n`;
             
             configScript += '    </script>\n    <script>';
 
@@ -212,11 +192,10 @@ export class TexRendererServer {
             return new Promise((resolve, reject) => {
                 this.server.listen(actualPort, 'localhost', () => {
                     this.port = actualPort;
-                    this.outputChannel.appendLine(`[Renderer Server] LaTeX renderer server started on port ${this.port}`);
-                    this.outputChannel.appendLine(`[Renderer Server] Access at: http://localhost:${this.port}`);
+                    this.outputChannel.appendLine(`[Markdown Server] Markdown renderer server started on port ${this.port}`);
                     resolve(this.port!);
                 }).on('error', (err: NodeJS.ErrnoException) => {
-                    this.outputChannel.appendLine(`[Renderer Server] Error starting server on port ${actualPort}: ${err.message}`);
+                    this.outputChannel.appendLine(`[Markdown Server] Error starting server on port ${actualPort}: ${err.message}`);
                     reject(err);
                 });
             });
@@ -229,19 +208,19 @@ export class TexRendererServer {
             } catch (error) {
                 // If a specific port was requested and failed, throw the error
                 if (port) {
-                    const errorMsg = `Failed to start server on port ${port}: ${error}`;
-                    this.outputChannel.appendLine(`[Renderer Server] ${errorMsg}`);
+                    const errorMsg = `Failed to start markdown server on port ${port}: ${error}`;
+                    this.outputChannel.appendLine(`[Markdown Server] ${errorMsg}`);
                     throw new Error(errorMsg);
                 }
                 // Otherwise, retry with a new random port
-                this.outputChannel.appendLine('[Renderer Server] Retrying with a new port...');
+                this.outputChannel.appendLine('[Markdown Server] Retrying with a new port...');
             }
         }
     }
 
     public stop(): void {
         if (this.server) {
-            this.outputChannel.appendLine('[Renderer Server] Stopping LaTeX renderer server...');
+            this.outputChannel.appendLine('[Markdown Server] Stopping markdown renderer server...');
             this.server.close();
             this.port = null;
         }

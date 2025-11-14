@@ -25,12 +25,12 @@ export class ListenerServer {
                 return;
             }
 
-            if (req.method === 'POST') {
+            if (req.method === 'POST' && (req.url === '/' || req.url === '/jump')) {
                 this.handlePostRequest(req, res);
             } else if (req.method === 'GET' && req.url === '/event') {
                 this.handleRefreshEventStream(req, res);
             } else {
-                this.outputChannel.appendLine(`[Listener Server] Method not allowed: ${req.method}`);
+                this.outputChannel.appendLine(`[Listener Server] Method not allowed: ${req.method} ${req.url}`);
                 res.writeHead(405, { 'Content-Type': 'text/plain' });
                 res.end('Method not allowed');
             }
@@ -114,6 +114,17 @@ export class ListenerServer {
         });
     }
 
+    public notifyClose(): void {
+        this.connectedClients.forEach(client => {
+            try {
+                client.write('data: {"type":"close"}\n\n');
+            } catch (error) {
+                // Silently remove failed clients
+                this.connectedClients.delete(client);
+            }
+        });
+    }
+
 
 
     public async start(port?: number): Promise<number> {
@@ -152,8 +163,14 @@ export class ListenerServer {
     public stop(): void {
         if (this.server) {
             this.outputChannel.appendLine('[Listener Server] Stopping listener server...');
-            this.server.close();
-            this.port = null;
+            // Notify all connected clients to close
+            this.notifyClose();
+            // Give clients a moment to receive the close signal
+            setTimeout(() => {
+                this.server.close();
+                this.connectedClients.clear();
+                this.port = null;
+            }, 100);
         }
     }
 

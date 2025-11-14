@@ -42,6 +42,11 @@
         "category": "LuTeX"
       },
       {
+        "command": "lutex-ext.launchSlidesWithListener",
+        "title": "Launch Slides Renderer with Listener",
+        "category": "LuTeX"
+      },
+      {
         "command": "lutex-ext.launchListener",
         "title": "Launch Listener Only",
         "category": "LuTeX"
@@ -79,6 +84,19 @@
           "enum": ["light", "dark"],
           "default": "dark",
           "description": "Default theme for the LuTeX renderer"
+        },
+        "lutex-ext.katexMacros": {
+          "type": "object",
+          "default": {
+            "\\ket": "\\lvert #1 \\rangle",
+            "\\bra": "\\langle #1 \\rvert",
+            "\\ip": "\\langle #1 | #2 \\rangle",
+            "\\dyad": "\\ket{#1} \\bra{#2}"
+          },
+          "description": "Custom KaTeX macros for math rendering. Define your own LaTeX shortcuts.",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }

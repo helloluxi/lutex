@@ -59,7 +59,7 @@ class LutexCore {
         this.romanNumerals = ['O', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
     }
 
-    async render(texPath) {
+    async render(texPath: string): Promise<string> {
         this.texPath = texPath;
         this.lineNum = 0;
         const startIdx = this.paraHtml.length;
@@ -219,8 +219,8 @@ class LutexCore {
             ).replace(
                 /~/g, () => '&nbsp;'
             ).replace(
-                /\\cite\{([^}]+)\}/g, (match, content) => {
-                    return content.split(',').map(c => `<span class="citation">[${c.trim()}]</span>`).join('');
+                /\\cite\{([^}]+)\}/g, (match: string, content: string) => {
+                    return content.split(',').map((c: string) => `<span class="citation">[${c.trim()}]</span>`).join('');
                 }
             ).replace(
                 /\\pf{([^}]+)}/g, (match, pfLabel) => {
@@ -253,9 +253,9 @@ class LutexCore {
     }
 
     // Second pass: process all autoref replacements after all files are rendered
-    processAutorefs(html) {
+    processAutorefs(html: string): string {
         return html.replace(
-            /\\(auto|app)ref\{([^}]+)\}/g, (match, _, labelKey) => {
+            /\\(auto|app)ref\{([^}]+)\}/g, (match: string, _: string, labelKey: string) => {
                 if (!labelKey || !this.autorefMap.has(labelKey)) {
                     return `<span class="todo">${match}</span>`;
                 }
@@ -280,7 +280,7 @@ class LutexCore {
     }
 
     // Helper function to extract content with paired braces
-    extractBracedContent(text, command) {
+    extractBracedContent(text: string, command: string): { content: string; rest: string; fullMatch: string } | null {
         const index = text.indexOf(command + '{');
         if (index === -1) return null;
         
@@ -303,6 +303,7 @@ class LutexCore {
         if (endIndex > startIndex) {
             return {
                 content: text.substring(startIndex, endIndex),
+                rest: text.substring(endIndex + 1),
                 fullMatch: text.substring(index, endIndex + 1)
             };
         }
@@ -310,52 +311,52 @@ class LutexCore {
         return null;
     }
 
-    firstCapitalized(str) {
+    firstCapitalized(str: string): string {
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
-    checkEquation(env) {
+    checkEquation(env: string): boolean {
         return ['equation', 'align', 'gather'].includes(env);
     }
 
-    checkMultiLineEq(env) {
+    checkMultiLineEq(env: string): boolean {
         return ['align', 'gather'].includes(env);
     }
 
-    checkTheorem(env) {
+    checkTheorem(env: string): boolean {
         return ['theorem', 'lemma', 'definition', 'corollary', 'example', 'problem'].includes(env);
     }
     
-    numberToRoman(num) {
+    numberToRoman(num: number): string {
         return this.romanNumerals[num] || num.toString();
     }
 
     // Get section reference format
-    getSecRef(num) {
+    getSecRef(num: number): string {
         return num > this.numSecBeforeAppx ?
             'Appx.&nbsp;' + String.fromCharCode(64 + num - this.numSecBeforeAppx) :
             'Sec.&nbsp;' + this.numberToRoman(num);
     }
 
     // Convert label key to HTML ID
-    labelToId(label) {
+    labelToId(label: string): string {
         return label.replace(':', '-');
     }
 
     // Get subsection name format (A, B, C, etc.)
-    getSubsecName(num) {
+    getSubsecName(num: number): string {
         return String.fromCharCode(64 + num); // A, B, C, D, ...
     }
 
     // Get section name format
-    getSecName(num) {
+    getSecName(num: number): string {
         return num > this.numSecBeforeAppx ?
             'Appendix ' + String.fromCharCode(64 + num - this.numSecBeforeAppx) :
             this.numberToRoman(num);
     }
 
     // Helper function to parse a single subfloat
-    parseSubfloat(subfloatMatch, figureIdx, subfloatIndex) {
+    parseSubfloat(subfloatMatch: string, figureIdx: number, subfloatIndex: number): any {
         const subfloatParts = subfloatMatch.match(/\\subfloat\[([^\]]*)\]\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/);
         if (!subfloatParts) return null;
         
@@ -390,7 +391,7 @@ class LutexCore {
     }
 
     // Parse figure environment
-    renderFig(content) {
+    renderFig(content: string): string {
         const figureIdx = this.figureLabels.length + 1;
         
         // First, check for and parse subfloat structures
@@ -402,7 +403,7 @@ class LutexCore {
             // Handle subfloat structure
             figureContent = '<div class="subfloats-container">';
             
-            subfloatMatches.forEach((subfloatMatch, index) => {
+            subfloatMatches.forEach((subfloatMatch: string, index: number) => {
                 const subfloatData = this.parseSubfloat(subfloatMatch, figureIdx, index);
                 if (subfloatData) {
                     figureContent += `
@@ -427,7 +428,7 @@ class LutexCore {
 
         // Now parse the main figure label (outside subfloats)
         let label = `fig:${figureIdx}`;
-        content = content.replace(/\\label\{([^}]+)\}/, (match, labelMatch) => {
+        content = content.replace(/\\label\{([^}]+)\}/, (match: string, labelMatch: string) => {
             label = labelMatch;
             return '';
         });
@@ -463,12 +464,12 @@ class LutexCore {
     }
 
     // Parse table environment
-    renderTab(content) {
+    renderTab(content: string): string {
         const tableIdx = this.tableLabels.length + 1;
 
         // Parse label
         let label = `tab:${tableIdx}`;
-        content = content.replace(/\\label\{([^}]+)\}/, (match, labelMatch) => {
+        content = content.replace(/\\label\{([^}]+)\}/, (match: string, labelMatch: string) => {
             label = labelMatch;
             return '';
         });
@@ -503,9 +504,9 @@ class LutexCore {
         // Parse table rows
         const rows = tableContent
             .split(/(?:\\\\)?\s*\\hline/)
-            .filter(row => row.trim())
-            .map(row => {
-                const cells = row.split('&').map(cell => cell.trim());
+            .filter((row: string) => row.trim())
+            .map((row: string) => {
+                const cells = row.split('&').map((cell: string) => cell.trim());
                 return `<tr><td>${cells.join('</td><td>')}</td></tr>`;
             })
             .join('\n');
@@ -521,10 +522,10 @@ class LutexCore {
     }
 
     // Parse equation environment
-    renderEquation(env, content) {
+    renderEquation(env: string, content: string): string {
         const eqIdx = this.equationLabels.length + 1;
         let label = `eq:${eqIdx}`;
-        content = content.replace(/\\label\{([^}]+)\}/, (match, labelMatch) => {
+        content = content.replace(/\\label\{([^}]+)\}/, (match: string, labelMatch: string) => {
             label = labelMatch;
             return '';
         });
@@ -546,10 +547,10 @@ class LutexCore {
     }
 
     // Parse list environment (itemize/enumerate)
-    renderList(content, numbered) {
+    renderList(content: string, numbered: boolean): string {
         const items = content.split(/\\item\s+/)
-            .filter(item => item.trim())
-            .map(item => `<li>${item.trim()}</li>`)
+            .filter((item: string) => item.trim())
+            .map((item: string) => `<li>${item.trim()}</li>`)
             .join('\n');
         const tag = numbered ? 'ol' : 'ul';
         return `<${tag} ${this.meta()}>${items}</${tag}>`;
@@ -605,7 +606,7 @@ export default class LutexArticle {
         };
     }
 
-    async render(texPath) {
+    async render(texPath: string): Promise<void> {
         texPath = this.tryAddExtension(texPath, '.tex');
         let mainContent = '';
         await fetch(texPath).then(res => res.text()).then(text => {

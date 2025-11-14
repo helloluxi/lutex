@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slides Viewer</title>
+  <link rel="icon" href="data:,">
+  
+  <!-- KaTeX CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71HotJqlAn" crossorigin="anonymous">
+  
+  <!-- KaTeX JavaScript -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" integrity="sha384-cpW21h6RZv/phavutF+AuVYrr+dA8xD9zs6FwLpaCct6O9ctzYFfFr4dgmgccOTx" crossorigin="anonymous"></script>
+  
+  <!-- KaTeX auto-render extension -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+  
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+  
+  <link rel="stylesheet" href="sd.css">
+  <script>
+    // Placeholder for server-injected configuration
+  </script>
+</head>
+
+<body>
+  <div class="slides-container" id="slides-container">
+    <!-- Content will be loaded here -->
+  </div>
+  <div class="progress-container">
+    <div class="progress-bar"></div>
+    <div class="slide-number">
+      <span class="nav-arrow" onclick="prevSlide()">&lt;</span>
+      <span id="slide-number-text">NaN</span>
+      <span class="nav-arrow" onclick="nextSlide()">&gt;</span>
+    </div>
+  </div>
+
+    <script type="module">
+    import MarkdownSlidesParser from '/dist/sdRenderer.js';
+    window.MarkdownSlidesParser = MarkdownSlidesParser;    class SlidesApp {
+      constructor() {
+        this.slideIdx = 0;
+        this.slides = [];
+        this.slideNumber = null;
+        this.progressBar = null;
+        this.isZoomed = false;
+        this.ZOOM_FACTOR = 2;
+        this.parser = new MarkdownSlidesParser();
+        // Get KaTeX macros from configuration or use defaults
+        this.katexMacros = window.lutexKatexMacros || {
+            "\\ket": "\\lvert #1 \\rangle",
+            "\\bra": "\\langle #1 \\rvert",
+            "\\ip": "\\langle #1 | #2 \\rangle",
+            "\\dyad": "\\ket{#1} \\bra{#2}"
+        };
+        this.isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+
+        this.init();
+      }
+
+      async init() {
+        this.slideNumber = document.querySelector('#slide-number-text');
+        this.progressBar = document.querySelector('.progress-bar');
+
+        this.setupEventListeners();
+        this.loadContent();
+      }
+
+      setupKatexRendering() {
+        // Configure KaTeX auto-render with loaded macros
+        const katexOptions = {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          macros: this.katexMacros,
+          throwOnError: false,
+          errorColor: '#cc0000',
+          strict: false
+        };
+
+        // Render math in the slides container
+        renderMathInElement(document.getElementById('slides-container'), katexOptions);
+      }
+
+      setupEventListeners() {
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+            this.nextSlide();
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+            this.prevSlide();
+          }
+        });
+
+        // Zoom functionality
+        document.addEventListener('keydown', (e) => this.handleZoom(e));
+        document.addEventListener('keyup', (e) => this.resetZoom(e));
+        document.addEventListener('mousemove', (e) => this.updateZoomPosition(e));
+
+        // Wheel navigation
+        this.setupWheelNavigation();
+
+        // Touch navigation
+        this.setupTouchNavigation();
+
+        // Navigation buttons
+        window.nextSlide = () => this.nextSlide();
+        window.prevSlide = () => this.prevSlide();
+      }
+
+      setupWheelNavigation() {
+        let wheelTimeout;
+        let accumulatedDelta = 0;
+
+        document.addEventListener('wheel', (e) => {
+          if (e.ctrlKey) return;
+          e.preventDefault();
+          accumulatedDelta += e.deltaY;
+
+          clearTimeout(wheelTimeout);
+          wheelTimeout = setTimeout(() => {
+            // Adjust threshold based on zoom level to maintain consistent behavior
+            const zoomLevel = window.devicePixelRatio || 1;
+            const adjustedThreshold = 100 / zoomLevel;
+            
+            const steps = Math.floor(Math.abs(accumulatedDelta) / adjustedThreshold);
+            const direction = accumulatedDelta > 0 ? 1 : -1;
+
+            for (let i = 0; i < steps; i++) {
+              if (direction > 0) {
+                this.nextSlide();
+              } else {
+                this.prevSlide();
+              }
+            }
+
+            if (this.slideIdx > 0 && this.slideIdx < this.slides.length - 1) {
+              this.slides[this.slideIdx].classList.add('fade-in');
+              setTimeout(() => {
+                this.slides[this.slideIdx].classList.remove('fade-in');
+              }, 1000);
+            }
+
+            accumulatedDelta = 0;
+          }, 50);
+        }, { passive: false });
+      }
+
+      setupTouchNavigation() {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        let initialTouchSlide = 0;
+        let initialTouchDistance = 0;
+
+        document.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 2) {
+            touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            initialTouchDistance = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            initialTouchSlide = this.slideIdx;
+          }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+          if (e.touches.length === 2) {
+            touchEndX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            touchEndY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            const currentTouchDistance = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+
+            if (Math.abs(currentTouchDistance - initialTouchDistance) < 50) {
+              e.preventDefault();
+              const deltaX = touchEndX - touchStartX;
+              const deltaY = touchEndY - touchStartY;
+              const screenWidth = window.innerWidth;
+              const totalSlides = this.slides.length - 1;
+
+              if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                const slideOffset = -deltaX / screenWidth;
+                const targetSlide = Math.round(initialTouchSlide + slideOffset);
+                this.slideIdx = Math.max(0, Math.min(targetSlide, totalSlides));
+                this.updateSlide();
+              }
+            }
+          }
+        }, { passive: false });
+      }
+
+      handleZoom(e) {
+        if (e.key === '`' && !this.isZoomed) {
+          this.isZoomed = true;
+          const slidesContainer = document.getElementById('slides-container');
+          slidesContainer.classList.add('zoomed');
+          this.updateZoomPosition(e);
+        }
+      }
+
+      resetZoom(e) {
+        if (e.key === '`') {
+          this.isZoomed = false;
+          const slidesContainer = document.getElementById('slides-container');
+          slidesContainer.classList.remove('zoomed');
+
+          const currentOrigin = slidesContainer.style.transformOrigin;
+          const currentTransform = slidesContainer.style.transform;
+
+          const matrix = new DOMMatrix(currentTransform);
+          const currentX = matrix.m41;
+          const currentY = matrix.m42;
+
+          slidesContainer.style.transition = 'transform 0.3s ease';
+          slidesContainer.style.transform = `translate(${currentX}px, ${currentY}px) scale(1)`;
+
+          setTimeout(() => {
+            slidesContainer.style.transition = 'none';
+            slidesContainer.style.transform = 'none';
+            slidesContainer.style.transformOrigin = '0 0';
+          }, 300);
+        }
+      }
+
+      updateZoomPosition(e) {
+        if (!this.isZoomed) return;
+
+        const slidesContainer = document.getElementById('slides-container');
+        const rect = slidesContainer.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const originX = (mouseX / rect.width) * 100;
+        const originY = (mouseY / rect.height) * 100;
+
+        slidesContainer.style.transformOrigin = `${originX}% ${originY}%`;
+        slidesContainer.style.transform = `scale(${this.ZOOM_FACTOR})`;
+      }
+
+      updateSlide() {
+        this.slides.forEach(slide => slide.classList.remove('active'));
+        this.slides[this.slideIdx].classList.add('active');
+
+        const adjustedSlideNumber = this.slideIdx === 0 ? 0 : this.slideIdx;
+        this.slideNumber.textContent = `${adjustedSlideNumber} / ${this.slides.length - 1}`;
+        this.progressBar.style.width = `${(adjustedSlideNumber / (this.slides.length - 1)) * 100}%`;
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('p', this.slideIdx);
+        window.history.replaceState({}, '', url.toString());
+
+        this.updateNavigationButtons();
+        
+        // Re-render math on slide change
+        this.setupKatexRendering();
+      }
+
+      updateNavigationButtons() {
+        const prevArrow = document.querySelector('.nav-arrow:first-child');
+        const nextArrow = document.querySelector('.nav-arrow:last-child');
+
+        if (this.slideIdx === 0) {
+          prevArrow.classList.add('disabled');
+        } else {
+          prevArrow.classList.remove('disabled');
+        }
+
+        if (this.slideIdx === this.slides.length - 1) {
+          nextArrow.classList.add('disabled');
+        } else {
+          nextArrow.classList.remove('disabled');
+        }
+      }
+
+      nextSlide() {
+        if (this.slideIdx < this.slides.length - 1) {
+          this.slideIdx++;
+          this.updateSlide();
+        }
+      }
+
+      prevSlide() {
+        if (this.slideIdx > 0) {
+          this.slideIdx--;
+          this.updateSlide();
+        }
+      }
+
+      async loadContent() {
+        try {
+          const markdownFile = window.lutexMarkdownFile || 'main.md';
+          const text = await fetch(`./${markdownFile}`).then(res => res.text());
+
+          // Parse markdown into slides
+          this.parser.parseMarkdown(text);
+
+          // Render slides to container
+          const slidesContainer = document.getElementById('slides-container');
+          this.slides = Array.from(this.parser.renderToContainer(slidesContainer));
+
+          // Handle URL parameters for slide navigation
+          const urlParams = new URLSearchParams(window.location.search);
+          const slideParam = urlParams.get('p');
+          if (slideParam) {
+            const parsedSlide = parseInt(slideParam) || 0;
+            this.slideIdx = Math.max(0, Math.min(parsedSlide, this.slides.length - 1));
+          }
+
+          this.updateSlide();
+          this.updateCurrentDate();
+
+          // Initial KaTeX rendering
+          this.setupKatexRendering();
+        } catch (error) {
+          console.error('Error loading content:', error);
+        }
+      }
+
+      updateCurrentDate() {
+        const dateElement = document.getElementById('current-date');
+        if (dateElement) {
+          const currentDate = new Date();
+          const formattedDate = currentDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          dateElement.textContent = `${formattedDate}`;
+        }
+      }
+
+      // Public API methods
+      goToSlide(index) {
+        if (index >= 0 && index < this.slides.length) {
+          this.slideIdx = index;
+          this.updateSlide();
+        }
+      }
+
+      getCurrentSlide() {
+        return this.slideIdx;
+      }
+
+      getTotalSlides() {
+        return this.slides.length;
+      }
+    }
+
+    // Wait for KaTeX to load before initializing the app
+    document.addEventListener('DOMContentLoaded', () => {
+      // Check if KaTeX and auto-render are loaded
+      const checkKatexLoaded = () => {
+        if (typeof katex !== 'undefined' && typeof renderMathInElement !== 'undefined') {
+          window.slidesApp = new SlidesApp();
+          
+          // Set up auto-refresh listener if running on localhost with listener port
+          const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const listenerPort = window.lutexListenerPort;
+
+          if (isLocalHost && listenerPort) {
+            const eventSource = new EventSource(`http://localhost:${listenerPort}/event`);
+            eventSource.addEventListener('message', (event) => {
+              try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'refresh') {
+                  // Save current slide before refresh
+                  const currentSlide = window.slidesApp.getCurrentSlide();
+                  localStorage.setItem('slidesCurrentSlide', currentSlide.toString());
+                  location.reload();
+                } else if (data.type === 'close') {
+                  // Server is shutting down, close the window/tab
+                  window.close();
+                } else if (data.type === 'scroll') {
+                  // Handle scroll/jump requests
+                  console.log('Scroll event received:', data);
+                }
+              } catch (error) {
+                console.error('Error processing event:', error);
+              }
+            });
+          }
+
+          // Restore slide position after page load
+          const savedSlide = localStorage.getItem('slidesCurrentSlide');
+          if (savedSlide !== null) {
+            window.slidesApp.goToSlide(parseInt(savedSlide, 10));
+            // Clear the saved position after restoring
+            localStorage.removeItem('slidesCurrentSlide');
+          }
+
+          // Add double-click to jump to source (only on localhost)
+          if (isLocalHost && listenerPort) {
+            document.addEventListener('dblclick', async (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              
+              // Find the closest element with a line attribute
+              let element = event.target;
+              let lineNumber = null;
+              
+              while (element && element !== document.body) {
+                if (element.hasAttribute && element.hasAttribute('line')) {
+                  lineNumber = element.getAttribute('line');
+                  break;
+                }
+                element = element.parentElement;
+              }
+              
+              if (lineNumber) {
+                const markdownFile = window.lutexMarkdownFile || 'main.md';
+                try {
+                  await fetch(`http://localhost:${listenerPort}/jump`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      file: markdownFile, 
+                      line: parseInt(lineNumber) 
+                    })
+                  });
+                } catch (error) {
+                  console.error('Failed to send jump request:', error);
+                }
+              }
+            });
+          }
+        } else {
+          setTimeout(checkKatexLoaded, 100);
+        }
+      };
+      checkKatexLoaded();
+    });
+  </script>
+</body>
+
+</html>

@@ -15,6 +15,17 @@ export function getThemeFromSettings(): string {
     return config.get<string>('theme') ?? 'dark';
 }
 
+export function getKatexMacrosFromSettings(): { [key: string]: string } {
+    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const defaultMacros = {
+        "\\ket": "\\lvert #1 \\rangle",
+        "\\bra": "\\langle #1 \\rvert",
+        "\\ip": "\\langle #1 | #2 \\rangle",
+        "\\dyad": "\\ket{#1} \\bra{#2}"
+    };
+    return config.get<{ [key: string]: string }>('katexMacros') ?? defaultMacros;
+}
+
 // Backward compatibility
 export function getPortFromSettings(): number | undefined {
     const config = vscode.workspace.getConfiguration('lutex-ext');

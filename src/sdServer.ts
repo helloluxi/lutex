@@ -2,9 +2,11 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { findAvailablePort, addCorsHeaders, handleOptionsRequest } from './tools';
+import { jumpToLine } from './fileNavigation';
+import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse } from './tools';
+import { getKatexMacrosFromSettings } from './settings';
 
-export class MdRendererServer {
+export class SdServer {
     private server: http.Server;
     private outputChannel: vscode.OutputChannel;
     private resourcesPath: string;
@@ -13,7 +15,7 @@ export class MdRendererServer {
 
     constructor(outputChannel: vscode.OutputChannel, extensionPath: string) {
         this.outputChannel = outputChannel;
-        this.resourcesPath = path.join(extensionPath, 'res', 'md');
+        this.resourcesPath = path.join(extensionPath, 'res', 'sd');
         this.distResourcesPath = path.join(extensionPath, 'res', 'dist');
         this.server = this.createServer();
     }
@@ -21,7 +23,7 @@ export class MdRendererServer {
     private createServer(): http.Server {
         return http.createServer((req, res) => {
             // Add CORS headers
-            addCorsHeaders(res, 'GET, OPTIONS');
+            addCorsHeaders(res, 'GET, POST, OPTIONS');
 
             // Handle preflight requests
             if (req.method === 'OPTIONS') {
@@ -29,12 +31,47 @@ export class MdRendererServer {
                 return;
             }
 
-            if (req.method === 'GET') {
+            if (req.method === 'POST') {
+                this.handlePostRequest(req, res);
+            } else if (req.method === 'GET') {
                 this.handleGetRequest(req, res);
             } else {
-                this.outputChannel.appendLine(`[Markdown Server] Method not allowed: ${req.method}`);
+                this.outputChannel.appendLine(`[Slides Server] Method not allowed: ${req.method}`);
                 res.writeHead(405, { 'Content-Type': 'text/plain' });
                 res.end('Method not allowed');
+            }
+        });
+    }
+
+    private handlePostRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                const { file, line } = data;
+                this.outputChannel.appendLine(`[Slides Server] Received jump request { file: ${file}, line: ${line} }`);
+                
+                const lineNumber = parseLineNumber(line, res, this.outputChannel);
+                if (lineNumber === null) return;
+                
+                if (file && typeof file === 'string' && lineNumber > 0) {
+                    jumpToLine(file, lineNumber, this.outputChannel);
+                    res.writeHead(200, { 'Content-Type': 'text/plain' });
+                    res.end('Success');
+                } else {
+                    const errorMsg = 'Invalid request format. Expected JSON with file (string) and line (number > 0) properties.';
+                    this.outputChannel.appendLine(`[Slides Server] Error: ${errorMsg}`);
+                    res.writeHead(400, { 'Content-Type': 'text/plain' });
+                    res.end(errorMsg);
+                }
+            } catch (error) {
+                const errorMsg = `Error processing HTTP data: ${error}`;
+                this.outputChannel.appendLine(`[Slides Server] ${errorMsg}`);
+                res.writeHead(500, { 'Content-Type': 'text/plain' });
+                res.end('Internal server error');
             }
         });
     }
@@ -61,16 +98,15 @@ export class MdRendererServer {
         let filePath: string;
         
         if (pathname === '/' || pathname === '/index.html') {
-            // Serve the main HTML file with potential modifications for theme and listener port
+            // Serve the main HTML file with potential modifications for listener port
             filePath = path.join(this.resourcesPath, 'index.html');
             
-            // Get URL parameters (using 'f' for file, 'o' for listener port, and 'm' for theme mode)
+            // Get URL parameters (using 'f' for file, 'o' for listener port)
             const markdownFile = url.searchParams.get('f');
             const listenerPort = url.searchParams.get('o');
-            const themeMode = url.searchParams.get('m');
             
-            if (markdownFile || listenerPort || themeMode) {
-                this.serveModifiedIndexHtml(filePath, markdownFile, listenerPort, themeMode, res);
+            if (markdownFile || listenerPort) {
+                this.serveModifiedIndexHtml(filePath, markdownFile, listenerPort, res);
                 return;
             }
         } else if (pathname.startsWith('/dist/')) {
@@ -126,7 +162,7 @@ export class MdRendererServer {
         // Read and serve the file
         fs.readFile(filePath, (err, data) => {
             if (err) {
-                this.outputChannel.appendLine(`[Markdown Server] Error reading file ${filePath}: ${err.message}`);
+                this.outputChannel.appendLine(`[Slides Server] Error reading file ${filePath}: ${err.message}`);
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('Internal server error');
                 return;
@@ -137,14 +173,17 @@ export class MdRendererServer {
         });
     }
 
-    private serveModifiedIndexHtml(filePath: string, markdownFile: string | null, listenerPort: string | null, themeMode: string | null, res: http.ServerResponse): void {
+    private serveModifiedIndexHtml(filePath: string, markdownFile: string | null, listenerPort: string | null, res: http.ServerResponse): void {
         fs.readFile(filePath, 'utf8', (err, data) => {
             if (err) {
-                this.outputChannel.appendLine(`[Markdown Server] Error reading file ${filePath}: ${err.message}`);
+                this.outputChannel.appendLine(`[Slides Server] Error reading file ${filePath}: ${err.message}`);
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('Internal server error');
                 return;
             }
+
+            // Get KaTeX macros from settings
+            const katexMacros = getKatexMacrosFromSettings();
 
             // Build configuration script
             let configScript = '<script>\n';
@@ -159,10 +198,9 @@ export class MdRendererServer {
                 configScript += `        window.lutexListenerPort = ${parseInt(listenerPort)};\n`;
             }
             
-            if (themeMode) {
-                configScript += `        // Theme mode configuration\n`;
-                configScript += `        window.lutexDefaultTheme = '${themeMode}';\n`;
-            }
+            // Add KaTeX macros configuration
+            configScript += `        // KaTeX macros configuration\n`;
+            configScript += `        window.lutexKatexMacros = ${JSON.stringify(katexMacros)};\n`;
             
             configScript += '    </script>\n    <script>';
 
@@ -184,11 +222,10 @@ export class MdRendererServer {
             return new Promise((resolve, reject) => {
                 this.server.listen(actualPort, 'localhost', () => {
                     this.port = actualPort;
-                    this.outputChannel.appendLine(`[Markdown Server] Markdown renderer server started on port ${this.port}`);
-                    this.outputChannel.appendLine(`[Markdown Server] Access at: http://localhost:${this.port}`);
+                    this.outputChannel.appendLine(`[Slides Server] Slides renderer server started on port ${this.port}`);
                     resolve(this.port!);
                 }).on('error', (err: NodeJS.ErrnoException) => {
-                    this.outputChannel.appendLine(`[Markdown Server] Error starting server on port ${actualPort}: ${err.message}`);
+                    this.outputChannel.appendLine(`[Slides Server] Error starting server on port ${actualPort}: ${err.message}`);
                     reject(err);
                 });
             });
@@ -201,19 +238,19 @@ export class MdRendererServer {
             } catch (error) {
                 // If a specific port was requested and failed, throw the error
                 if (port) {
-                    const errorMsg = `Failed to start markdown server on port ${port}: ${error}`;
-                    this.outputChannel.appendLine(`[Markdown Server] ${errorMsg}`);
+                    const errorMsg = `Failed to start slides server on port ${port}: ${error}`;
+                    this.outputChannel.appendLine(`[Slides Server] ${errorMsg}`);
                     throw new Error(errorMsg);
                 }
                 // Otherwise, retry with a new random port
-                this.outputChannel.appendLine('[Markdown Server] Retrying with a new port...');
+                this.outputChannel.appendLine('[Slides Server] Retrying with a new port...');
             }
         }
     }
 
     public stop(): void {
         if (this.server) {
-            this.outputChannel.appendLine('[Markdown Server] Stopping markdown renderer server...');
+            this.outputChannel.appendLine('[Slides Server] Stopping slides renderer server...');
             this.server.close();
             this.port = null;
         }

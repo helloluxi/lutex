@@ -1,5 +1,5 @@
 // @ts-nocheck
-import LutexArticle from './lutexRenderer.js';
+import LutexArticle from './texRenderer.js';
 import ThemeManager from './Theme.js';
 import CommandLine  from './lutexCmd.js';
 
