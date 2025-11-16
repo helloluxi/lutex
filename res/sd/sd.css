@@ -304,6 +304,7 @@ tr:hover {
 .figure {
     text-align: center;
     margin-bottom: 1rem;
+    width: 100%;
 }
 
 .figure-content {
@@ -313,9 +314,12 @@ tr:hover {
 
 .figure img {
     max-width: 100%;
+    width: 100%;
     height: auto;
     border-radius: 4px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    display: block;
+    margin: 0 auto;
 }
 
 .figure-caption {
@@ -330,12 +334,18 @@ tr:hover {
 .row {
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 2rem;
     margin: 2rem 0;
 }
 
 .row .figure {
     flex: 0 1 auto;
+    margin-bottom: 0;
+}
+
+.row .figure img {
+    width: 100%;
 }
 
 .qr-box {
@@ -544,11 +554,9 @@ pre:hover .copy-button {
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(20px);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
@@ -566,10 +574,12 @@ pre:hover .copy-button {
     align-items: center;
     justify-content: center;
     padding: 1rem;
+    margin-inline: 10rem;
 }
 
-.qr-container img {
-    max-width: 200px;
+.qr-container img,
+.qr-container canvas {
+    width: 80%;
     height: auto;
 }
 

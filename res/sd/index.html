@@ -114,40 +114,63 @@
       }
 
       setupWheelNavigation() {
-        let wheelTimeout;
-        let accumulatedDelta = 0;
+        let scrollStartTime = null;
+        let lastScrollTime = 0;
+        let scrollDirection = 0; // 1 for down, -1 for up
+        let scrollTimeout;
+        const SCROLL_COOLDOWN = 150; // ms between slide changes
 
         document.addEventListener('wheel', (e) => {
           if (e.ctrlKey) return;
           e.preventDefault();
-          accumulatedDelta += e.deltaY;
 
-          clearTimeout(wheelTimeout);
-          wheelTimeout = setTimeout(() => {
-            // Adjust threshold based on zoom level to maintain consistent behavior
-            const zoomLevel = window.devicePixelRatio || 1;
-            const adjustedThreshold = 100 / zoomLevel;
+          const currentTime = Date.now();
+          const currentDirection = e.deltaY > 0 ? 1 : -1;
+
+          // Detect if this is a new scroll gesture or continuation
+          if (scrollStartTime === null || currentDirection !== scrollDirection || (currentTime - lastScrollTime) > 300) {
+            // New scroll gesture
+            scrollStartTime = currentTime;
+            scrollDirection = currentDirection;
+          }
+
+          lastScrollTime = currentTime;
+
+          // Calculate how long the user has been scrolling
+          const scrollDuration = currentTime - scrollStartTime;
+
+          // Clear any pending timeout
+          clearTimeout(scrollTimeout);
+
+          // Determine number of slides to move based on scroll duration
+          // First slide happens immediately, then every SCROLL_COOLDOWN ms
+          const slidesMoved = Math.floor(scrollDuration / SCROLL_COOLDOWN);
+          
+          // Only move if we haven't moved this many slides yet in this gesture
+          if (!this.lastSlidesMoved || slidesMoved > this.lastSlidesMoved) {
+            this.lastSlidesMoved = slidesMoved;
             
-            const steps = Math.floor(Math.abs(accumulatedDelta) / adjustedThreshold);
-            const direction = accumulatedDelta > 0 ? 1 : -1;
-
-            for (let i = 0; i < steps; i++) {
-              if (direction > 0) {
-                this.nextSlide();
-              } else {
-                this.prevSlide();
-              }
+            if (scrollDirection > 0) {
+              this.nextSlide();
+            } else {
+              this.prevSlide();
             }
 
+            // Add fade effect
             if (this.slideIdx > 0 && this.slideIdx < this.slides.length - 1) {
               this.slides[this.slideIdx].classList.add('fade-in');
               setTimeout(() => {
                 this.slides[this.slideIdx].classList.remove('fade-in');
               }, 1000);
             }
+          }
 
-            accumulatedDelta = 0;
-          }, 50);
+          // Reset after user stops scrolling
+          scrollTimeout = setTimeout(() => {
+            scrollStartTime = null;
+            this.lastSlidesMoved = 0;
+            scrollDirection = 0;
+          }, 300);
         }, { passive: false });
       }
 

@@ -197,12 +197,13 @@ export class SlidesRenderer {
             } else if (trimmedLine.startsWith('\\figure')) {
                 renderCachedLines();
                 closeList();
-                const match = trimmedLine.match(/\\figure(?:\[([^\]]*)\])?\{([^}]*)\}\{([^}]*)\}/);
+                const match = trimmedLine.match(/\\figure(?:\[([^\]]*)\])?\{([^}]*)\}\{((?:[^{}]|\{(?:[^{}]|\{[^}]*\})*\})*)\}/);
                 if (match) {
                     const [, ratio, src, caption] = match;
                     const ratioAttr = ratio || '1.0';
                     const imgSrc = src.includes('://') ? src : `${this.graphicsPath}/${src}`;
-                    this.currentContent += `<div class="figure" line="${lineNumber}"><img src="${imgSrc}" alt="${caption}" style="width: ${parseFloat(ratioAttr) * 100}%; height: auto;"><div class="figure-caption">${caption}</div></div>`;
+                    const widthPercent = parseFloat(ratioAttr) * 100;
+                    this.currentContent += `<div class="figure" style="max-width: ${widthPercent}%;" line="${lineNumber}"><img src="${imgSrc}" alt="${caption}"><div class="figure-caption">${caption}</div></div>`;
                 }
                 continue;
             } else if (trimmedLine.startsWith('\\qrcode{')) {
