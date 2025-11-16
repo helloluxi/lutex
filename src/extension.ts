@@ -417,8 +417,8 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Ask user for resolution
             const resolutionOptions = [
-                { label: '1440x1080 (Default 4:3)', width: 1440, height: 1080 },
                 { label: '1920x1080 (Full HD 16:9)', width: 1920, height: 1080 },
+                { label: '1440x1080 (4:3)', width: 1440, height: 1080 },
                 { label: '1280x720 (HD 16:9)', width: 1280, height: 720 },
                 { label: '1600x1200 (4:3)', width: 1600, height: 1200 },
                 { label: 'Custom...', width: 0, height: 0 }

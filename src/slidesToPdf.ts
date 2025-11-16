@@ -427,6 +427,20 @@ async function generatePDFWithPuppeteer(
                 .instance-container {
                     box-shadow: 0 2px 4px rgba(0, 123, 255, 0.08) !important;
                 }
+                /* Ensure footnote rule is visible in PDF - matching HTML styles */
+                .footnote {
+                    position: relative !important;
+                }
+                .footnote::before {
+                    content: '' !important;
+                    display: block !important;
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 2rem !important;
+                    right: 2rem !important;
+                    height: 1px !important;
+                    background-color: #333 !important;
+                }
                 @media print {
                     * {
                         -webkit-print-color-adjust: exact !important;
@@ -449,6 +463,15 @@ async function generatePDFWithPuppeteer(
                     }
                     .container {
                         box-shadow: 0 3px 5px rgba(170, 170, 170, 0.2) !important;
+                    }
+                    /* Ensure footnote rule is visible in print mode */
+                    .footnote {
+                        position: relative !important;
+                    }
+                    .footnote::before {
+                        content: '' !important;
+                        display: block !important;
+                        background-color: #333 !important;
                     }
                 }
             `
