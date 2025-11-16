@@ -82,8 +82,8 @@ export class SlidesRenderer {
             .replace(/\\strong\{([^}]*)\}/g, (match, content) => {
                 return `<strong>${content}</strong>`;
             })
-            // Handle \emph{...}
-            .replace(/\\emph\{([^}]*)\}/g, (match, content) => {
+            // Handle \em{...}
+            .replace(/\\em\{([^}]*)\}/g, (match, content) => {
                 return `<em>${content}</em>`;
             })
             // Handle \cite[url]{footnote text}
@@ -255,10 +255,10 @@ export class SlidesRenderer {
                 closeList();
                 this.currentContent += `</div><div class="column" line="${lineNumber}">`;
                 continue;
-            } else if (trimmedLine.startsWith('\\beginrow')) {
+            } else if (trimmedLine.startsWith('\\row')) {
                 renderCachedLines();
                 closeList();
-                this.currentContent += `<div class="figure-row" line="${lineNumber}">`;
+                this.currentContent += `<div class="row" line="${lineNumber}">`;
                 continue;
             } else if (trimmedLine.startsWith('\\endrow')) {
                 renderCachedLines();

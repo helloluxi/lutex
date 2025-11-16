@@ -327,6 +327,24 @@ tr:hover {
     width: 100%;
 }
 
+.row {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin: 2rem 0;
+}
+
+.row .figure {
+    flex: 0 1 auto;
+}
+
+.qr-box {
+    background: var(--bg-white);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px var(--shadow-light);
+}
+
 code {
     background: var(--bg-tertiary);
     padding: 0.2em 0.4em;

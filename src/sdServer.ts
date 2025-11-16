@@ -121,9 +121,9 @@ export class SdServer {
             const fileName = pathname.startsWith('/') ? pathname.substring(1) : pathname;
             filePath = path.join(workspaceFolder.uri.fsPath, fileName);
         } else {
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
-            res.end('File not found');
-            return;
+            // Serve other files (images, etc.) from the workspace
+            const fileName = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+            filePath = path.join(workspaceFolder.uri.fsPath, fileName);
         }
 
         // Check if file exists
@@ -156,6 +156,25 @@ export class SdServer {
                 break;
             case '.md':
                 contentType = 'text/markdown';
+                break;
+            case '.png':
+                contentType = 'image/png';
+                break;
+            case '.jpg':
+            case '.jpeg':
+                contentType = 'image/jpeg';
+                break;
+            case '.gif':
+                contentType = 'image/gif';
+                break;
+            case '.svg':
+                contentType = 'image/svg+xml';
+                break;
+            case '.webp':
+                contentType = 'image/webp';
+                break;
+            case '.ico':
+                contentType = 'image/x-icon';
                 break;
         }
 
