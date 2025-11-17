@@ -92,6 +92,10 @@ export class SlidesRenderer {
             })
             // Handle \cite[url]{footnote text}
             .replace(/\\cite(?:\[(.*?)\])?\{([^}]*)\}/g, (match, url, footnoteText) => {
+                // Skip empty citations
+                if (!footnoteText || footnoteText.trim() === '') {
+                    return match; // Return original text for empty citations
+                }
                 this.citeIdx++;
                 this.citeTexts.push(footnoteText);
                 return `<span class="footnote-cite" data-idx="${this.citeIdx}" data-url="${url}">[${this.citeIdx}]</span>`;
@@ -119,8 +123,7 @@ export class SlidesRenderer {
             if (joinedLines.startsWith('<') && joinedLines.endsWith('>')) {
                 this.currentContent += `<div line="${currentLineNumber}">${joinedLines}</div>`;
             } else if (joinedLines.length > 0) {
-                const processedText = this.postprocessText(joinedLines);
-                this.currentContent += `<p line="${currentLineNumber}">${processedText}</p>`;
+                this.currentContent += `<p line="${currentLineNumber}">${joinedLines}</p>`;
             }
             cachedLines = [];
         };
@@ -207,7 +210,7 @@ export class SlidesRenderer {
                     const ratioAttr = ratio || '1.0';
                     const imgSrc = src.includes('://') ? src : `${this.graphicsPath}/${src}`;
                     const widthPercent = parseFloat(ratioAttr) * 100;
-                    this.currentContent += `<div class="figure" style="max-width: ${widthPercent}%;" line="${lineNumber}"><img src="${imgSrc}" alt="${caption}"><div class="figure-caption">${caption}</div></div>`;
+                    this.currentContent += `<div class="figure" style="max-width: ${widthPercent}%;" line="${lineNumber}"><img src="${imgSrc}"><div class="figure-caption">${caption}</div></div>`;
                 }
                 continue;
             } else if (trimmedLine.startsWith('\\qrcode{')) {
@@ -303,7 +306,7 @@ export class SlidesRenderer {
                         }
                     }
 
-                    this.currentContent += `<li line="${lineNumber}">${this.postprocessText(listContent)}</li>`;
+                    this.currentContent += `<li line="${lineNumber}">${listContent}</li>`;
                     lastListLevel = thisListLevel;
                 }
                 continue;
@@ -386,7 +389,7 @@ export class SlidesRenderer {
 
     private closeCurrentSlide(): void {
         if (this.currentSlide) {
-            this.currentSlide.content = this.currentContent;
+            this.currentSlide.content = this.postprocessText(this.currentContent);
             this.slides.push(this.currentSlide);
             this.currentSlide = null;
             this.currentContent = '';

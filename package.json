@@ -114,6 +114,18 @@
           "default": "",
           "description": "Path to Chrome/Chromium executable for PDF generation. Leave empty to auto-detect. Example: C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
           "scope": "machine"
+        },
+        "lutex-ext.autoLaunch": {
+          "type": "string",
+          "enum": ["none", "slides", "tex", "listener"],
+          "default": "none",
+          "description": "Automatically launch renderer on startup. 'slides' and 'tex' will also launch the listener.",
+          "enumDescriptions": [
+            "Do not auto-launch anything",
+            "Launch Slides renderer with listener on startup",
+            "Launch LuTeX renderer with listener on startup",
+            "Launch listener only on startup"
+          ]
         }
       }
     }

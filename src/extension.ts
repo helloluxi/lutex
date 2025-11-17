@@ -6,7 +6,7 @@ import { ListenerServer } from './listenerServer';
 import { TexServer } from './texServer';
 import { MdServer } from './mdServer';
 import { SdServer } from './sdServer';
-import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings } from './settings';
+import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings, getAutoLaunchFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
 import { generateSlidePDF } from './slidesToPdf';
@@ -753,6 +753,28 @@ export function activate(context: vscode.ExtensionContext) {
         jumpToSlidesCommand,
         statusBar
     );
+
+    // Auto-launch based on settings
+    const autoLaunch = getAutoLaunchFromSettings();
+    if (autoLaunch !== 'none') {
+        outputChannel.appendLine(`[LuTeX] Auto-launch mode: ${autoLaunch}`);
+        
+        // Use setTimeout to defer auto-launch after activation completes
+        setTimeout(async () => {
+            try {
+                if (autoLaunch === 'slides') {
+                    await vscode.commands.executeCommand('lutex-ext.launchSlidesWithListener');
+                } else if (autoLaunch === 'tex') {
+                    await vscode.commands.executeCommand('lutex-ext.launchLutexWithListener');
+                } else if (autoLaunch === 'listener') {
+                    await vscode.commands.executeCommand('lutex-ext.launchListener');
+                }
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                outputChannel.appendLine(`[LuTeX] Auto-launch failed: ${errorMsg}`);
+            }
+        }, 1000);
+    }
 
     // Clean up when the extension is deactivated
     context.subscriptions.push({
