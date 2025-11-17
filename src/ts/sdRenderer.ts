@@ -92,10 +92,6 @@ export class SlidesRenderer {
             })
             // Handle \cite[url]{footnote text}
             .replace(/\\cite(?:\[(.*?)\])?\{([^}]*)\}/g, (match, url, footnoteText) => {
-                // Skip empty citations
-                if (!footnoteText || footnoteText.trim() === '') {
-                    return match; // Return original text for empty citations
-                }
                 this.citeIdx++;
                 this.citeTexts.push(footnoteText);
                 return `<span class="footnote-cite" data-idx="${this.citeIdx}" data-url="${url}">[${this.citeIdx}]</span>`;

@@ -200,8 +200,6 @@
                 if (this.pos >= this.input.length) {
                     throw TypeError("Runaway key: key");
                 };
-                                // а-яА-Я is Cyrillic
-                //console.log(this.input[this.pos]);
                 if (this.notKey.indexOf(this.input[this.pos]) >= 0) {
                     if (optional && this.input[this.pos] != ',') {
                         this.pos = start;
