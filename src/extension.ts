@@ -239,6 +239,33 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }
 
+            // Always scaffold a static slides site into workspace ROOT for optional static hosting
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (workspaceFolder) {
+                try {
+                    const targetRoot = workspaceFolder.uri.fsPath; // root
+                    const distDir = path.join(targetRoot, 'dist');
+                    const srcIndex = path.join(context.extensionPath, 'res', 'sd', 'index.html');
+                    const srcCss = path.join(context.extensionPath, 'res', 'sd', 'sd.css');
+                    const srcJs = path.join(context.extensionPath, 'res', 'dist', 'sdRenderer.js');
+
+                    const dstIndex = path.join(targetRoot, 'index.html');
+                    const dstCss = path.join(targetRoot, 'sd.css');
+                    const dstJs = path.join(distDir, 'sdRenderer.js');
+
+                    await vscode.workspace.fs.createDirectory(vscode.Uri.file(targetRoot));
+                    await vscode.workspace.fs.createDirectory(vscode.Uri.file(distDir));
+                    await vscode.workspace.fs.copy(vscode.Uri.file(srcIndex), vscode.Uri.file(dstIndex), { overwrite: true } as any);
+                    await vscode.workspace.fs.copy(vscode.Uri.file(srcCss), vscode.Uri.file(dstCss), { overwrite: true } as any);
+                    await vscode.workspace.fs.copy(vscode.Uri.file(srcJs), vscode.Uri.file(dstJs), { overwrite: true } as any);
+
+                    outputChannel.appendLine(`[LuTeX] Slides static scaffold refreshed at workspace root: ${targetRoot}`);
+                } catch (scaffoldErr) {
+                    const errMsg = scaffoldErr instanceof Error ? scaffoldErr.message : String(scaffoldErr);
+                    outputChannel.appendLine(`[LuTeX] Warning: Unable to scaffold static slides: ${errMsg}`);
+                }
+            }
+
             // Start listener first if not already running
             if (!listenerServer.isRunning()) {
                 const configuredListenerPort = getListenerPortFromSettings();
@@ -258,7 +285,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const params = new URLSearchParams();
                 
                 // Add markdown file parameter
-                params.append('f', markdownFileName);
+                params.append('f', markdownFileName || 'main.md');
                 
                 if (listenerServer.isRunning()) {
                     const listenerPort = listenerServer.getPort();
@@ -287,7 +314,7 @@ export function activate(context: vscode.ExtensionContext) {
             const params = new URLSearchParams();
             
             // Add markdown file parameter
-            params.append('f', markdownFileName);
+            params.append('f', markdownFileName || 'main.md');
             
             if (listenerServer.isRunning()) {
                 const listenerPort = listenerServer.getPort();
@@ -301,7 +328,7 @@ export function activate(context: vscode.ExtensionContext) {
             
             // Automatically open browser
             vscode.env.openExternal(vscode.Uri.parse(url));
-            outputChannel.appendLine(`[LuTeX] Slides renderer started on port ${serverPort} with listener integration (file: ${markdownFileName})`);
+            outputChannel.appendLine(`[LuTeX] Slides renderer started on port ${serverPort} with listener integration (file: ${markdownFileName || 'main.md'})`);
             
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -399,6 +426,30 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`[LuTeX] Sending scroll request for ${fileName}:${lineNumber}`);
         listenerServer.notifyScroll(fileName, lineNumber);
     });
+
+    // Jump to Slides (slides renderer or static page connected to listener)
+    const jumpToSlidesCommand = vscode.commands.registerCommand('lutex-ext.jumpToSlides', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            outputChannel.appendLine('[LuTeX] No active editor');
+            return;
+        }
+
+        if (!listenerServer.isRunning()) {
+            outputChannel.appendLine('[LuTeX] Listener server not running');
+            vscode.window.showWarningMessage('Listener server is not running. Please start it or launch Slides with Listener.');
+            return;
+        }
+
+        const document = editor.document;
+        const position = editor.selection.active;
+        const lineNumber = position.line + 1;
+        const fileName = path.relative(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', document.fileName);
+
+        outputChannel.appendLine(`[LuTeX] Sending slides jump request for ${fileName}:${lineNumber}`);
+        listenerServer.notifyScroll(fileName, lineNumber);
+    });
+
 
     // Export Slides to PDF
     const exportSlidesToPdfCommand = vscode.commands.registerCommand('lutex-ext.exportSlidesToPdf', async () => {
@@ -699,6 +750,7 @@ export function activate(context: vscode.ExtensionContext) {
         jumpToHtmlCommand,
         exportSlidesToPdfCommand,
         showStatusCommand,
+        jumpToSlidesCommand,
         statusBar
     );
 

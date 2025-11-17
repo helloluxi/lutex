@@ -62,6 +62,11 @@
         "category": "LuTeX"
       },
       {
+        "command": "lutex-ext.jumpToSlides",
+        "title": "Jump to Slides (Current Line)",
+        "category": "LuTeX"
+      },
+      {
         "command": "lutex-ext.exportSlidesToPdf",
         "title": "Export Slides to PDF",
         "category": "LuTeX",

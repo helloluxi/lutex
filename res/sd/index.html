@@ -37,8 +37,9 @@
     </div>
   </div>
 
-    <script type="module">
-    import MarkdownSlidesParser from '/dist/sdRenderer.js';
+  <script type="module">
+  // Support both server-hosted and static-hosted usage by using a relative import
+  import MarkdownSlidesParser from './dist/sdRenderer.js';
     window.MarkdownSlidesParser = MarkdownSlidesParser;    class SlidesApp {
       constructor() {
         this.slideIdx = 0;
@@ -320,6 +321,17 @@
 
       async loadContent() {
         try {
+          // Allow URL params fallback when not injected by server
+          const urlParams = new URLSearchParams(window.location.search);
+          if (typeof window.lutexMarkdownFile === 'undefined') {
+            const f = urlParams.get('f');
+            if (f) { window.lutexMarkdownFile = f; }
+          }
+          if (typeof window.lutexListenerPort === 'undefined') {
+            const o = urlParams.get('o');
+            if (o) { window.lutexListenerPort = parseInt(o, 10); }
+          }
+
           const markdownFile = window.lutexMarkdownFile || 'main.md';
           const text = await fetch(`./${markdownFile}`).then(res => res.text());
 
@@ -331,8 +343,8 @@
           this.slides = Array.from(this.parser.renderToContainer(slidesContainer));
 
           // Handle URL parameters for slide navigation
-          const urlParams = new URLSearchParams(window.location.search);
-          const slideParam = urlParams.get('p');
+          const navParams = new URLSearchParams(window.location.search);
+          const slideParam = navParams.get('p');
           if (slideParam) {
             const parsedSlide = parseInt(slideParam) || 0;
             this.slideIdx = Math.max(0, Math.min(parsedSlide, this.slides.length - 1));
@@ -403,8 +415,22 @@
                   // Server is shutting down, close the window/tab
                   window.close();
                 } else if (data.type === 'scroll') {
-                  // Handle scroll/jump requests
-                  console.log('Scroll event received:', data);
+                  // Jump to the slide that best matches the requested source line
+                  const targetLine = parseInt(data.line, 10);
+                  const slides = Array.from(document.querySelectorAll('.slide'));
+                  if (slides.length > 0 && !Number.isNaN(targetLine)) {
+                    // Choose the last slide whose starting line is <= targetLine
+                    let targetIdx = 0;
+                    for (let i = 0; i < slides.length; i++) {
+                      const sLine = parseInt(slides[i].getAttribute('line') || '0', 10);
+                      if (sLine <= targetLine) {
+                        targetIdx = i;
+                      } else {
+                        break;
+                      }
+                    }
+                    window.slidesApp.goToSlide(targetIdx);
+                  }
                 }
               } catch (error) {
                 console.error('Error processing event:', error);
