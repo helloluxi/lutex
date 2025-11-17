@@ -86,6 +86,10 @@ export class SlidesRenderer {
             .replace(/\\em\{([^}]*)\}/g, (match, content) => {
                 return `<em>${content}</em>`;
             })
+            // Handle \todo{...}
+            .replace(/\\todo\{([^}]*)\}/g, (match, content) => {
+                return `<span class="todo">TODO: ${content}</span>`;
+            })
             // Handle \cite[url]{footnote text}
             .replace(/\\cite(?:\[(.*?)\])?\{([^}]*)\}/g, (match, url, footnoteText) => {
                 this.citeIdx++;
