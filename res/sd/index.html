@@ -182,6 +182,7 @@
         let touchEndY = 0;
         let initialTouchSlide = 0;
         let initialTouchDistance = 0;
+        let hasChangedSlide = false;
 
         document.addEventListener('touchstart', (e) => {
           if (e.touches.length === 2) {
@@ -192,11 +193,12 @@
               e.touches[0].clientY - e.touches[1].clientY
             );
             initialTouchSlide = this.slideIdx;
+            hasChangedSlide = false;
           }
         }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
-          if (e.touches.length === 2) {
+          if (e.touches.length === 2 && !hasChangedSlide) {
             touchEndX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
             touchEndY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
             const currentTouchDistance = Math.hypot(
@@ -210,16 +212,25 @@
               const deltaY = touchEndY - touchStartY;
               const screenWidth = window.innerWidth;
               const totalSlides = this.slides.length - 1;
+              const SWIPE_THRESHOLD = screenWidth * 0.2; // 20% of screen width
 
-              if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                const slideOffset = -deltaX / screenWidth;
-                const targetSlide = Math.round(initialTouchSlide + slideOffset);
-                this.slideIdx = Math.max(0, Math.min(targetSlide, totalSlides));
-                this.updateSlide();
+              if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+                const direction = deltaX > 0 ? -1 : 1; // Swipe right = previous, left = next
+                const targetSlide = initialTouchSlide + direction;
+                
+                if (targetSlide >= 0 && targetSlide <= totalSlides) {
+                  this.slideIdx = targetSlide;
+                  this.updateSlide();
+                  hasChangedSlide = true;
+                }
               }
             }
           }
         }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+          hasChangedSlide = false;
+        }, { passive: true });
       }
 
       handleZoom(e) {
