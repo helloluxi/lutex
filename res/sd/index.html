@@ -374,8 +374,9 @@
       updateCurrentDate() {
         const dateElement = document.getElementById('current-date');
         if (dateElement) {
+          const lang = dateElement.getAttribute('data-lang') || 'en-US';
           const currentDate = new Date();
-          const formattedDate = currentDate.toLocaleDateString('en-US', {
+          const formattedDate = currentDate.toLocaleDateString(lang, {
             year: 'numeric',
             month: 'long',
             day: 'numeric'

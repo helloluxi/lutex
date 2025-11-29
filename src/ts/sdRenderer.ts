@@ -195,7 +195,9 @@ export class SlidesRenderer {
             } else if (trimmedLine.startsWith('\\today')) {
                 renderCachedLines();
                 closeList();
-                this.currentContent += `<p id="current-date" style="font-size: 2rem;" line="${lineNumber}"></p>`;
+                const match = trimmedLine.match(/\\today(?:\{([^}]*)\})?/);
+                const lang = match?.[1];
+                this.currentContent += `<p id="current-date"${lang ? ` data-lang="${lang}"` : ''} style="font-size: 2rem;" line="${lineNumber}"></p>`;
                 continue;
             } else if (trimmedLine.startsWith('\\figure')) {
                 renderCachedLines();
