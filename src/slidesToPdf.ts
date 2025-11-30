@@ -9,6 +9,7 @@ export interface Slides2PdfOptions {
     height: number;
     outputPath: string;
     executablePath?: string;
+    date?: string;
 }
 
 /**
@@ -366,6 +367,18 @@ async function generatePDFWithPuppeteer(
 
         const outputLabel = path.basename(resolvedOutput);
         outputChannel.appendLine(`[Slides2PDF] Found ${totalSlides} slides. Generating PDF: ${outputLabel} (${width}x${height})`);
+
+        // Replace current-date element if date is provided
+        if (options.date && options.date.trim() !== '') {
+            await page.evaluate((dateText: string) => {
+                // @ts-ignore - Running in browser context
+                const dateElement = document.getElementById('current-date');
+                if (dateElement) {
+                    dateElement.textContent = dateText;
+                }
+            }, options.date.trim());
+            outputChannel.appendLine(`[Slides2PDF] Set date to: ${options.date.trim()}`);
+        }
 
         // Apply PDF styles optimized for Chrome presentation mode
         await page.addStyleTag({

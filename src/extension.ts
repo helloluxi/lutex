@@ -239,33 +239,6 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }
 
-            // Always scaffold a static slides site into workspace ROOT for optional static hosting
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-            if (workspaceFolder) {
-                try {
-                    const targetRoot = workspaceFolder.uri.fsPath; // root
-                    const distDir = path.join(targetRoot, 'dist');
-                    const srcIndex = path.join(context.extensionPath, 'res', 'sd', 'index.html');
-                    const srcCss = path.join(context.extensionPath, 'res', 'sd', 'sd.css');
-                    const srcJs = path.join(context.extensionPath, 'res', 'dist', 'sdRenderer.js');
-
-                    const dstIndex = path.join(targetRoot, 'index.html');
-                    const dstCss = path.join(targetRoot, 'sd.css');
-                    const dstJs = path.join(distDir, 'sdRenderer.js');
-
-                    await vscode.workspace.fs.createDirectory(vscode.Uri.file(targetRoot));
-                    await vscode.workspace.fs.createDirectory(vscode.Uri.file(distDir));
-                    await vscode.workspace.fs.copy(vscode.Uri.file(srcIndex), vscode.Uri.file(dstIndex), { overwrite: true } as any);
-                    await vscode.workspace.fs.copy(vscode.Uri.file(srcCss), vscode.Uri.file(dstCss), { overwrite: true } as any);
-                    await vscode.workspace.fs.copy(vscode.Uri.file(srcJs), vscode.Uri.file(dstJs), { overwrite: true } as any);
-
-                    outputChannel.appendLine(`[LuTeX] Slides static scaffold refreshed at workspace root: ${targetRoot}`);
-                } catch (scaffoldErr) {
-                    const errMsg = scaffoldErr instanceof Error ? scaffoldErr.message : String(scaffoldErr);
-                    outputChannel.appendLine(`[LuTeX] Warning: Unable to scaffold static slides: ${errMsg}`);
-                }
-            }
-
             // Start listener first if not already running
             if (!listenerServer.isRunning()) {
                 const configuredListenerPort = getListenerPortFromSettings();
@@ -532,6 +505,20 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             const defaultPath = vscode.Uri.joinPath(workspaceFolder.uri, 'out', 'slides.pdf');
+
+            // Ask for date string BEFORE showing the native save dialog. Putting this earlier
+            // ensures the InputBox isn't hidden or blocked by native file dialogs or progress UIs.
+            let dateString: string | undefined = await vscode.window.showInputBox({
+                prompt: 'Enter date for slides (optional)',
+                placeHolder: 'e.g., December 1, 2025',
+                value: ''
+            });
+
+            // If the user cancelled the input box, treat it as empty (no date).
+            if (typeof dateString === 'undefined') {
+                dateString = '';
+            }
+
             const saveUri = await vscode.window.showSaveDialog({
                 defaultUri: defaultPath,
                 filters: {
@@ -588,7 +575,8 @@ export function activate(context: vscode.ExtensionContext) {
                         width,
                         height,
                         outputPath: saveUri.fsPath,
-                        executablePath: chromePath
+                        executablePath: chromePath,
+                        date: dateString
                     }, outputChannel);
 
                     progress.report({ message: 'Complete!' });
