@@ -95,6 +95,10 @@ export class SlidesRenderer {
                 this.citeIdx++;
                 this.citeTexts.push(footnoteText);
                 return `<span class="footnote-cite" data-idx="${this.citeIdx}" data-url="${url}">[${this.citeIdx}]</span>`;
+            })
+            // Handle \style[...]{text}, where [...] are CSS styles
+            .replace(/\\style\[(.*?)\]\{([^}]*)\}/g, (match, styles, content) => {
+                return `<span style="${styles}">${content}</span>`;
             });
     }
 
@@ -165,13 +169,22 @@ export class SlidesRenderer {
                     this.currentContent += `<div class="quote-container" line="${lineNumber}"><p class="quote-text">${text}</p><p class="quote-author">- ${author}</p></div>`;
                 }
                 continue;
-            } else if (trimmedLine.startsWith('\\centertitle{')) {
+            } else if (trimmedLine.startsWith('\\bcenter{')) {
                 renderCachedLines();
                 closeList();
-                const match = trimmedLine.match(/\\centertitle\{([^}]*)\}/);
+                const match = trimmedLine.match(/\\bcenter\{([^}]*)\}/);
                 if (match) {
                     const content = match[1];
-                    this.currentContent += `<h1 style="font-size: 6rem; color: #3498db; text-align: center;" line="${lineNumber}">${content}</h1>`;
+                    this.currentContent += `<h1 class="bcenter" line="${lineNumber}">${content}</h1>`;
+                }
+                continue;
+            } else if (trimmedLine.startsWith('\\hcenter{')) {
+                renderCachedLines();
+                closeList();
+                const match = trimmedLine.match(/\\hcenter\{([^}]*)\}/);
+                if (match) {
+                    const content = match[1];
+                    this.currentContent += `<div class="hcenter" line="${lineNumber}">${content}</div>`;
                 }
                 continue;
             } else if (trimmedLine.startsWith('\\subtitle{')) {
@@ -211,18 +224,19 @@ export class SlidesRenderer {
                     this.currentContent += `<div class="figure" style="max-width: ${widthPercent}%;" line="${lineNumber}"><img src="${imgSrc}"><div class="figure-caption">${caption}</div></div>`;
                 }
                 continue;
-            } else if (trimmedLine.startsWith('\\qrcode{')) {
+            } else if (trimmedLine.startsWith('\\qrcode')) {
                 renderCachedLines();
                 closeList();
-                const match = trimmedLine.match(/\\qrcode\{([^}]*)\}\{([^}]*)\}/);
+                const match = trimmedLine.match(/\\qrcode(?:\[([^\]]*)\])?\{([^}]*)\}\{([^}]*)\}/);
                 if (match) {
-                    const [, message, caption] = match;
+                    const [, styles, message, caption] = match;
+                    const styleAttr = styles ? ` style="${styles}"` : '';
                     try {
                         const qrId = 'qr-' + Math.random().toString(36).substr(2, 9);
-                        this.currentContent += `<div class="figure" line="${lineNumber}"><div class="qr-box"><div class="qr-container" id="${qrId}" data-message="${message}"></div><div class="figure-caption">${caption}</div></div></div>`;
+                        this.currentContent += `<div class="qr-item"${styleAttr} line="${lineNumber}"><div class="qr-container" id="${qrId}" data-message="${message}"></div><div class="qr-caption">${caption}</div></div>`;
                     } catch (error) {
                         console.error('Error generating QR code:', error);
-                        this.currentContent += `<div class="figure" line="${lineNumber}"><div class="qr-box"><div class="qr-error">Error generating QR code</div><div class="figure-caption">${caption}</div></div></div>`;
+                        this.currentContent += `<div class="qr-item"${styleAttr} line="${lineNumber}"><div class="qr-error">Error generating QR code</div><div class="qr-caption">${caption}</div></div>`;
                     }
                 }
                 continue;

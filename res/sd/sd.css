@@ -340,19 +340,39 @@ tr:hover {
 }
 
 .row .figure {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     margin-bottom: 0;
+    max-width: 45%;
+}
+
+/* Single item in row should take less space */
+.row .figure:only-child {
+    max-width: 35%;
 }
 
 .row .figure img {
     width: 100%;
 }
 
-.qr-box {
+/* QR code item styling */
+.qr-item {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
     background: var(--bg-white);
     border-radius: 12px;
     padding: 2rem;
     box-shadow: 0 4px 6px var(--shadow-light);
+}
+
+/* When inside a row, inherit sizing */
+.row .qr-item {
+    flex: 0 0 auto;
+    max-width: 45%;
+}
+
+.row .qr-item:only-child {
+    max-width: 35%;
 }
 
 code {
@@ -570,23 +590,22 @@ pre:hover .copy-button {
 
 .qr-container {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
-    margin-inline: 10rem;
+    margin-bottom: 1rem;
 }
 
 .qr-container img,
 .qr-container canvas {
-    width: 80%;
-    height: auto;
+    width: 300px;
+    height: 300px;
+    max-width: 100%;
 }
 
 .qr-caption {
-    margin-top: 0.5rem;
-    font-size: 1.2rem;
-    color: var(--text-secondary);
+    font-style: italic;
+    color: var(--text-caption);
+    font-size: 1.8rem;
     text-align: center;
 }
 
@@ -602,4 +621,26 @@ pre:hover .copy-button {
     color: #f44336;
     font-style: italic;
     font-weight: bold;
+}
+
+/* Special title styles */
+.bcenter {
+    font-size: 6rem;
+    color: var(--primary-blue);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+}
+
+.hcenter {
+    display: flex;
+    justify-content: center;
+    text-align: center;
+    color: var(--primary-blue);
+    font-size: 4.8rem;
+    font-weight: 700;
+    margin: 2rem 0;
 }
