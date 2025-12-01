@@ -6,7 +6,7 @@ import { ListenerServer } from './listenerServer';
 import { TexServer } from './texServer';
 import { MdServer } from './mdServer';
 import { SdServer } from './sdServer';
-import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings, getAutoLaunchFromSettings } from './settings';
+import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings, getAutoLaunchFromSettings, getPdfExportDateFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
 import { generateSlidePDF } from './slidesToPdf';
@@ -506,18 +506,8 @@ export function activate(context: vscode.ExtensionContext) {
 
             const defaultPath = vscode.Uri.joinPath(workspaceFolder.uri, 'out', 'slides.pdf');
 
-            // Ask for date string BEFORE showing the native save dialog. Putting this earlier
-            // ensures the InputBox isn't hidden or blocked by native file dialogs or progress UIs.
-            let dateString: string | undefined = await vscode.window.showInputBox({
-                prompt: 'Enter date for slides (optional)',
-                placeHolder: 'e.g., December 1, 2025',
-                value: ''
-            });
-
-            // If the user cancelled the input box, treat it as empty (no date).
-            if (typeof dateString === 'undefined') {
-                dateString = '';
-            }
+            // Read date string from workspace settings
+            const dateString = getPdfExportDateFromSettings();
 
             const saveUri = await vscode.window.showSaveDialog({
                 defaultUri: defaultPath,

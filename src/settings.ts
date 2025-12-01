@@ -32,6 +32,11 @@ export function getAutoLaunchFromSettings(): string {
     return config.get<string>('autoLaunch') ?? 'none';
 }
 
+export function getPdfExportDateFromSettings(): string {
+    const config = vscode.workspace.getConfiguration('lutex-ext');
+    return config.get<string>('pdfExportDate') ?? '';
+}
+
 // Backward compatibility
 export function getPortFromSettings(): number | undefined {
     const config = vscode.workspace.getConfiguration('lutex-ext');
