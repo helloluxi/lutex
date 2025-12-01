@@ -306,36 +306,67 @@ function setupScrollTracking() {
         }
     });
     
-    // ===== LOCALHOST INTEGRATION =====
-    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    // ===== LISTENER INTEGRATION =====
+    // Only enable listener if 'o' parameter is present in URL (indicating VSCode launched server)
     const listenerPort = window.lutexListenerPort || lutex.localHostPort;
     
-    if (isLocalHost && listenerPort && listenerPort !== 0) {
-        // Add click handler for line numbers
+    if (listenerPort && listenerPort !== 0) {
+        // Use current hostname instead of hardcoding localhost for LAN support
+        const listenerHost = window.location.hostname;
+        
+        // Function to send jump request
+        const sendJumpRequest = (element: Element) => {
+            const file = element.getAttribute('file');
+            const line = element.getAttribute('line');
+            if (!file || !line) return;
+            fetch(`http://${listenerHost}:${listenerPort}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    file,
+                    line
+                })
+            }).catch(error => console.error('Error sending line number:', error));
+        };
+        
+        // Add double-click handler for desktop
         document.addEventListener('dblclick', (e) => {
             let element = e.target;
             while (element && !element.hasAttribute('line')) {
                 element = element.parentElement;
             }
             if (element) {
-                const file = element.getAttribute('file');
-                const line = element.getAttribute('line');
-                if (!file || !line) return;
-                fetch(`http://localhost:${listenerPort}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        file,
-                        line
-                    })
-                }).catch(error => console.error('Error sending line number:', error));
+                sendJumpRequest(element);
+            }
+        });
+        
+        // Add touch handler for mobile/tablet (detect double-tap)
+        let lastTap = 0;
+        let lastTapElement: Element | null = null;
+        document.addEventListener('touchend', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            
+            let element = e.target;
+            while (element && !element.hasAttribute('line')) {
+                element = element.parentElement;
+            }
+            
+            if (element && tapLength < 500 && tapLength > 0 && element === lastTapElement) {
+                // Double-tap detected
+                e.preventDefault();
+                sendJumpRequest(element);
+                lastTap = 0; // Reset to prevent triple-tap triggering
+            } else {
+                lastTap = currentTime;
+                lastTapElement = element;
             }
         });
         
         // Set up auto-refresh listener
-        const eventSource = new EventSource(`http://localhost:${listenerPort}/event`);
+        const eventSource = new EventSource(`http://${listenerHost}:${listenerPort}/event`);
         eventSource.addEventListener('message', (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -348,15 +379,14 @@ function setupScrollTracking() {
                 console.error('Error processing refresh event:', error);
             }
         });
-        
-        console.log(`Localhost integration enabled on port ${listenerPort}`);
     }
 }
 
 // Setup localhost jump for equation labels
 function setupLocalhostJump() {
-    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocalHost) {
+    // Only enable if listener integration is available (indicated by lutexListenerPort)
+    const listenerPort = window.lutexListenerPort;
+    if (listenerPort && listenerPort !== 0) {
         // Add click handlers for equation numbers (KaTeX generates these)
         document.addEventListener('click', (e) => {
             // Check if clicked element or its parent is an equation number

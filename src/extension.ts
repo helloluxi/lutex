@@ -6,7 +6,7 @@ import { ListenerServer } from './listenerServer';
 import { TexServer } from './texServer';
 import { MdServer } from './mdServer';
 import { SdServer } from './sdServer';
-import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings, getAutoLaunchFromSettings, getPdfExportDateFromSettings } from './settings';
+import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings, getAutoLaunchFromSettings, getPdfExportDateFromSettings, getAllowLANFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
 import { generateSlidePDF } from './slidesToPdf';

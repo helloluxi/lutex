@@ -37,6 +37,15 @@ export function getPdfExportDateFromSettings(): string {
     return config.get<string>('pdfExportDate') ?? '';
 }
 
+export function getAllowLANFromSettings(): boolean {
+    const config = vscode.workspace.getConfiguration('lutex-ext');
+    return config.get<boolean>('allowLAN') ?? false;
+}
+
+export function getServerHostname(): string {
+    return getAllowLANFromSettings() ? '0.0.0.0' : 'localhost';
+}
+
 // Backward compatibility
 export function getPortFromSettings(): number | undefined {
     const config = vscode.workspace.getConfiguration('lutex-ext');

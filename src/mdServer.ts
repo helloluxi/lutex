@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { findAvailablePort, addCorsHeaders, handleOptionsRequest } from './tools';
-import { getKatexMacrosFromSettings } from './settings';
+import { getKatexMacrosFromSettings, getServerHostname } from './settings';
 
 export class MdServer {
     private server: http.Server;
@@ -186,34 +186,37 @@ export class MdServer {
     }
 
     public async start(port?: number): Promise<number> {
-        const tryStart = async (): Promise<number> => {
-            const actualPort = port || await findAvailablePort();
-            
-            return new Promise((resolve, reject) => {
-                this.server.listen(actualPort, 'localhost', () => {
-                    this.port = actualPort;
-                    this.outputChannel.appendLine(`[Markdown Server] Markdown renderer server started on port ${this.port}`);
-                    resolve(this.port!);
-                }).on('error', (err: NodeJS.ErrnoException) => {
-                    this.outputChannel.appendLine(`[Markdown Server] Error starting server on port ${actualPort}: ${err.message}`);
-                    reject(err);
-                });
-            });
-        };
-
-        // Keep retrying until successful
+        let currentPort = port;
+        const hostname = getServerHostname();
+        
         while (true) {
             try {
-                return await tryStart();
+                const actualPort = currentPort || await findAvailablePort(hostname);
+                
+                // Recreate server for each attempt to avoid binding issues
+                this.server = this.createServer();
+                
+                const serverPort = await new Promise<number>((resolve, reject) => {
+                    this.server.listen(actualPort, hostname, () => {
+                        this.port = actualPort;
+                        this.outputChannel.appendLine(`[Markdown Server] Markdown renderer server started on port ${this.port}`);
+                        resolve(this.port!);
+                    }).on('error', (err: NodeJS.ErrnoException) => {
+                        this.outputChannel.appendLine(`[Markdown Server] Error starting server on port ${actualPort}: ${err.message}`);
+                        reject(err);
+                    });
+                });
+                
+                return serverPort;
             } catch (error) {
-                // If a specific port was requested and failed, throw the error
-                if (port) {
-                    const errorMsg = `Failed to start markdown server on port ${port}: ${error}`;
-                    this.outputChannel.appendLine(`[Markdown Server] ${errorMsg}`);
-                    throw new Error(errorMsg);
+                if (currentPort) {
+                    // Increment port and try again
+                    currentPort++;
+                    this.outputChannel.appendLine(`[Markdown Server] Retrying with port ${currentPort}...`);
+                } else {
+                    // Auto-detect mode failed, this shouldn't happen but log it
+                    this.outputChannel.appendLine('[Markdown Server] Auto-detect port failed, retrying...');
                 }
-                // Otherwise, retry with a new random port
-                this.outputChannel.appendLine('[Markdown Server] Retrying with a new port...');
             }
         }
     }

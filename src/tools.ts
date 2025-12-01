@@ -7,10 +7,11 @@ import * as vscode from 'vscode';
 
 /**
  * Find an available port starting from 12023, trying up to 100 consecutive ports
+ * @param hostname - The hostname to test on (default: 'localhost')
  * @returns Promise<number> - The available port
  * @throws Error if no available port found after 100 attempts
  */
-export function findAvailablePort(): Promise<number> {
+export function findAvailablePort(hostname: string = 'localhost'): Promise<number> {
     return new Promise((resolve, reject) => {
         const startPort = 12023;
         const maxAttempts = 100;
@@ -25,7 +26,7 @@ export function findAvailablePort(): Promise<number> {
             attemptCount++;
             const testServer = http.createServer();
 
-            testServer.listen(port, 'localhost', () => {
+            testServer.listen(port, hostname, () => {
                 testServer.close(() => {
                     resolve(port);
                 });

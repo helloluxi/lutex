@@ -411,12 +411,12 @@
         if (typeof katex !== 'undefined' && typeof renderMathInElement !== 'undefined') {
           window.slidesApp = new SlidesApp();
           
-          // Set up auto-refresh listener if running on localhost with listener port
-          const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          // Set up auto-refresh listener if listener port is provided
           const listenerPort = window.lutexListenerPort;
 
-          if (isLocalHost && listenerPort) {
-            const eventSource = new EventSource(`http://localhost:${listenerPort}/event`);
+          if (listenerPort) {
+            const listenerHost = window.location.hostname;
+            const eventSource = new EventSource(`http://${listenerHost}:${listenerPort}/event`);
             eventSource.addEventListener('message', (event) => {
               try {
                 const data = JSON.parse(event.data);
@@ -460,8 +460,27 @@
             localStorage.removeItem('slidesCurrentSlide');
           }
 
-          // Add double-click to jump to source (only on localhost)
-          if (isLocalHost && listenerPort) {
+          // Add jump to source functionality (enabled when listener port is provided)
+          if (listenerPort) {
+            const listenerHost = window.location.hostname;
+            
+            const sendJumpRequest = async (lineNumber) => {
+              const markdownFile = window.lutexMarkdownFile || 'main.md';
+              try {
+                await fetch(`http://${listenerHost}:${listenerPort}/jump`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    file: markdownFile, 
+                    line: parseInt(lineNumber) 
+                  })
+                });
+              } catch (error) {
+                console.error('Jump error:', error);
+              }
+            };
+            
+            // Desktop: double-click handler
             document.addEventListener('dblclick', async (event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -479,19 +498,35 @@
               }
               
               if (lineNumber) {
-                const markdownFile = window.lutexMarkdownFile || 'main.md';
-                try {
-                  await fetch(`http://localhost:${listenerPort}/jump`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                      file: markdownFile, 
-                      line: parseInt(lineNumber) 
-                    })
-                  });
-                } catch (error) {
-                  console.error('Failed to send jump request:', error);
+                await sendJumpRequest(lineNumber);
+              }
+            });
+            
+            // Mobile/Tablet: double-tap handler
+            let lastTap = 0;
+            let lastTapElement = null;
+            document.addEventListener('touchend', async (event) => {
+              const currentTime = new Date().getTime();
+              const tapLength = currentTime - lastTap;
+              
+              let element = event.target;
+              let lineNumber = null;
+              
+              while (element && element !== document.body) {
+                if (element.hasAttribute && element.hasAttribute('line')) {
+                  lineNumber = element.getAttribute('line');
+                  break;
                 }
+                element = element.parentElement;
+              }
+              
+              if (element && lineNumber && tapLength < 500 && tapLength > 0 && element === lastTapElement) {
+                event.preventDefault();
+                await sendJumpRequest(lineNumber);
+                lastTap = 0;
+              } else {
+                lastTap = currentTime;
+                lastTapElement = element;
               }
             });
           }
