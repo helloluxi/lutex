@@ -482,6 +482,10 @@ pre:hover .copy-button {
     text-decoration: none;
 }
 
+.footnote .footnote-num {
+    color: var(--primary-blue);
+}
+
 /* Unified column system */
 .columns {
     display: grid;

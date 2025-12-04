@@ -525,7 +525,11 @@ export class SlidesRenderer {
                         footnoteParagraph.appendChild(link);
                         footnoteParagraph.appendChild(document.createTextNode(` ${footnoteText}`));
                     } else {
-                        footnoteParagraph.appendChild(document.createTextNode(`[${citeIdx}] ${footnoteText}`));
+                        const numSpan = document.createElement('span');
+                        numSpan.className = 'footnote-num';
+                        numSpan.textContent = `[${citeIdx}]`;
+                        footnoteParagraph.appendChild(numSpan);
+                        footnoteParagraph.appendChild(document.createTextNode(` ${footnoteText}`));
                     }
                 });
             }
