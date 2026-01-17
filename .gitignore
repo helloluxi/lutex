@@ -5,3 +5,4 @@ out/
 *.vsix
 package-lock.json
 Claude.md
+.DS_Store

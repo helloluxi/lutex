@@ -18,7 +18,7 @@ const transformPatterns: TransformPattern[] = [
             '',
             '\\begin{equation}',
             '\\begin{aligned}',
-            content,
+            '    ' + content,
             '\\end{aligned}',
             '\\end{equation}',
             ''
@@ -32,7 +32,7 @@ const transformPatterns: TransformPattern[] = [
             '',
             '\\begin{equation}',
             '\\begin{aligned}',
-            content.trim(),
+            '    ' + content.trim(),
             '\\end{aligned}',
             '\\end{equation}',
             ''
@@ -55,20 +55,29 @@ export function registerFileCommands(context: vscode.ExtensionContext, outputCha
 
         // Try to match against all transformation patterns
         for (const pattern of transformPatterns) {
-            if (selectedText.startsWith(pattern.prefix) && 
-                selectedText.endsWith(pattern.suffix) && 
-                selectedText.length > pattern.prefix.length + pattern.suffix.length) {
-                
-                // Extract the content between the prefix and suffix
+            // For inline math pattern, check for $...$ with optional trailing punctuation
+            if (pattern.prefix === '$' && pattern.suffix === '$') {
+                const match = selectedText.match(/^\$(.+)\$([,;.]?)$/);
+                if (match && match[1]) {
+                    const content = match[1] + (match[2] || '');
+                    const transformedText = pattern.targetFormat(content);
+
+                    editor.edit(editBuilder => {
+                        editBuilder.replace(selection, transformedText);
+                    });
+
+                    outputChannel.appendLine(`[Inline to Display] Converted ${pattern.description} to display format: ${content.trim()}`);
+                    return;
+                }
+            } else if (selectedText.startsWith(pattern.prefix) && 
+                       selectedText.endsWith(pattern.suffix) && 
+                       selectedText.length > pattern.prefix.length + pattern.suffix.length) {
                 const content = selectedText.slice(
                     pattern.prefix.length, 
                     selectedText.length - pattern.suffix.length
                 );
-                
-                // Apply the transformation
                 const transformedText = pattern.targetFormat(content);
 
-                // Replace the selected text
                 editor.edit(editBuilder => {
                     editBuilder.replace(selection, transformedText);
                 });
