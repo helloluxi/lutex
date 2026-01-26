@@ -77,7 +77,7 @@ class LutexCore {
             if (line.length !== 0) {
                 // If we had multiple empty lines, start a new paragraph
                 if (emptyLineCount !== 0) {
-                    this.paraHtml.push(`<br>`);
+                    this.paraHtml.push(`<br><br>`);
                     if (this.envContent.length > 0) {
                         this.paraHtml.push(`<div class="todo">${this.envContent.join(' ')}</div>`);
                     }
