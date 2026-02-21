@@ -1,8 +1,11 @@
 .vscode/
+.memory/
 node_modules/
 dist/
 out/
 *.vsix
 package-lock.json
-Claude.md
 .DS_Store
+
+CLAUDE.md
+.github/copilot-instructions.md

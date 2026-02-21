@@ -3,9 +3,10 @@
  * @param markdown - The markdown content as string
  * @param element - The HTML element to render the content into
  * @param katexMacros - Custom KaTeX macros object (optional, defaults to basic macros)
+ * @param markdownFilePath - Path to the markdown file for resolving relative image paths (optional)
  * @returns Promise that resolves when rendering is complete
  */
-export async function renderMarkdownWithMath(markdown: string, element: HTMLElement, katexMacros?: { [key: string]: string }): Promise<void> {
+export async function renderMarkdownWithMath(markdown: string, element: HTMLElement, katexMacros?: { [key: string]: string }, markdownFilePath?: string): Promise<void> {
     // Use provided macros or default to basic set
     const macros = katexMacros || {
         "\\ket": "\\lvert #1 \\rangle",
@@ -15,7 +16,7 @@ export async function renderMarkdownWithMath(markdown: string, element: HTMLElem
     };
     
     // Render markdown first
-    element.innerHTML = renderMarkdown(markdown.split('\n'));
+    element.innerHTML = renderMarkdown(markdown.split('\n'), markdownFilePath);
     
     // Wait for KaTeX to be ready (loaded from HTML) and render math
     try {
@@ -37,17 +38,29 @@ export async function renderMarkdownWithMath(markdown: string, element: HTMLElem
 
 /**
  * Takes array of lines and returns rendered HTML
+ * @param lines - Array of markdown lines
+ * @param markdownFilePath - Path to the markdown file for resolving relative image paths (optional)
  */
 export const renderMarkdown = (function() {
     // Global number counter that persists across renders
     let globalNumberCounter = 1;
     
     // Helper function to process inline markdown (code and URLs)
-    function processInlineMarkdown(line: string) {
+    function processInlineMarkdown(line: string, markdownFileDir: string) {
         let processedLine = line;
         
         // Process inline code: `code`
         processedLine = processedLine.replace(/`([^`]+)`/g, '<code>$1</code>');
+        
+        // Process images: ![alt](path) - must be before links since similar syntax
+        processedLine = processedLine.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, imgPath) => {
+            // If path is relative (doesn't start with http:// or https:// or /), prepend markdown file directory
+            let resolvedPath = imgPath;
+            if (markdownFileDir && !/^(https?:\/\/|\/)/i.test(imgPath)) {
+                resolvedPath = markdownFileDir + imgPath;
+            }
+            return `<img src="${resolvedPath}" alt="${alt}">`;
+        });
         
         // Process markdown links: [text](url)
         processedLine = processedLine.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
@@ -62,7 +75,7 @@ export const renderMarkdown = (function() {
     }
     
     // Helper function to render paragraph content
-    function renderParaContent(paraLines: string[]) {
+    function renderParaContent(paraLines: string[], markdownFileDir: string) {
         if (paraLines.length === 0) return '';
         
         let tmpHtml = `<div class="para">`;
@@ -115,7 +128,7 @@ export const renderMarkdown = (function() {
                 });
 
                 // Add number for + items, keep - items as is
-                const processedLine = processInlineMarkdown(trimmedLine);
+                const processedLine = processInlineMarkdown(trimmedLine, markdownFileDir);
                 if (line.trim().startsWith('+ ')) {
                     tmpHtml += `<li>${globalNumberCounter++}. ${processedLine}</li>`;
                 } else {
@@ -128,7 +141,7 @@ export const renderMarkdown = (function() {
             closeList();
             
             // Process inline markdown for regular lines
-            const processedLine = processInlineMarkdown(line);
+            const processedLine = processInlineMarkdown(line, markdownFileDir);
             cachedLines.push(processedLine);
         }
         
@@ -171,10 +184,17 @@ export const renderMarkdown = (function() {
     }
     
     // Main rendering function
-    return function(lines: string[]): string {
+    return function(lines: string[], markdownFilePath?: string): string {
         if (!lines || lines.length === 0) return '';
-        
-        let html = '';
+                // Extract directory from markdown file path
+        let markdownFileDir = '';
+        if (markdownFilePath) {
+            const lastSlash = markdownFilePath.lastIndexOf('/');
+            if (lastSlash >= 0) {
+                markdownFileDir = markdownFilePath.substring(0, lastSlash + 1);
+            }
+        }
+                let html = '';
         let currentPara: string[] = [];
         let inCodeBlock = false;
         let codeBlockLang = '';
@@ -196,7 +216,7 @@ export const renderMarkdown = (function() {
             if (trimmedLine.startsWith('```') && !inCodeBlock) {
                 // Start of code block
                 if (currentPara.length > 0) {
-                    html += renderParaContent(currentPara);
+                    html += renderParaContent(currentPara, markdownFileDir);
                     currentPara = [];
                 }
                 inCodeBlock = true;
@@ -221,7 +241,7 @@ export const renderMarkdown = (function() {
             if (trimmedLine.match(/^#{1,3} /)) {
                 // Render any accumulated paragraph content first
                 if (currentPara.length > 0) {
-                    html += renderParaContent(currentPara);
+                    html += renderParaContent(currentPara, markdownFileDir);
                     currentPara = [];
                 }
                 
@@ -230,7 +250,7 @@ export const renderMarkdown = (function() {
             } else if (trimmedLine === '') {
                 // Empty line - check if we should close current paragraph
                 if (currentPara.length > 0) {
-                    html += renderParaContent(currentPara);
+                    html += renderParaContent(currentPara, markdownFileDir);
                     currentPara = [];
                 }
             } else {
@@ -241,7 +261,7 @@ export const renderMarkdown = (function() {
         
         // Handle any remaining paragraph content
         if (currentPara.length > 0) {
-            html += renderParaContent(currentPara);
+            html += renderParaContent(currentPara, markdownFileDir);
         }
         
         // Handle unclosed code block

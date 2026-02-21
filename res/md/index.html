@@ -61,8 +61,9 @@
         async function init() {
             const contentElement = document.getElementById('mainContainer');
             try {
+                const markdownFile = window.lutexMarkdownFile || 'main.md';
                 const markdown = await loadMarkdown();
-                await renderMarkdownWithMath(markdown, contentElement, katexMacros);
+                await renderMarkdownWithMath(markdown, contentElement, katexMacros, markdownFile);
             } catch (error) {
                 console.error('Error loading content:', error);
                 contentElement.innerHTML = `
