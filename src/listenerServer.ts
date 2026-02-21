@@ -1,6 +1,6 @@
 import * as http from 'http';
 import * as vscode from 'vscode';
-import { jumpToLine } from './fileNavigation';
+import { jumpToLine, toggleCheckbox } from './fileNavigation';
 import { findAvailablePort, parseLineNumber, addCorsHeaders, handleOptionsRequest, sendErrorResponse } from './tools';
 import { getServerHostname } from './settings';
 
@@ -46,14 +46,18 @@ export class ListenerServer {
         req.on('end', () => {
             try {
                 const data = JSON.parse(body);
-                const { file, line } = data;
-                this.outputChannel.appendLine(`[Listener Server] Received jump request { file: ${file}, line: ${line} }`);
+                const { file, line, action = 'jump' } = data;
+                this.outputChannel.appendLine(`[Listener Server] Received ${action} request { file: ${file}, line: ${line} }`);
                 
                 const lineNumber = parseLineNumber(line, res, this.outputChannel);
                 if (lineNumber === null) return;
                 
                 if (file && typeof file === 'string' && lineNumber > 0) {
-                    jumpToLine(file, lineNumber, this.outputChannel);
+                    if (action === 'check') {
+                        toggleCheckbox(file, lineNumber, this.outputChannel);
+                    } else {
+                        jumpToLine(file, lineNumber, this.outputChannel);
+                    }
                     res.writeHead(200, { 'Content-Type': 'text/plain' });
                     res.end('Success');
                 } else {

@@ -64,6 +64,9 @@
                 const markdownFile = window.lutexMarkdownFile || 'main.md';
                 const markdown = await loadMarkdown();
                 await renderMarkdownWithMath(markdown, contentElement, katexMacros, markdownFile);
+                
+                // Setup double-click handler for jump-to-source
+                setupDoubleClickHandler();
             } catch (error) {
                 console.error('Error loading content:', error);
                 contentElement.innerHTML = `
@@ -73,6 +76,56 @@
                         <p style="color: var(--text-secondary, #666);">Please make sure the markdown file exists in your workspace.</p>
                     </div>
                 `;
+            }
+        }
+
+        // Setup double-click handler for jumping to source
+        function setupDoubleClickHandler() {
+            const listenerPort = window.lutexListenerPort;
+            
+            if (listenerPort && listenerPort !== 0) {
+                console.log('[LuTeX] Listener integration enabled:', { listenerPort, hostname: window.location.hostname });
+                const listenerHost = window.location.hostname;
+                
+                // Function to send jump request
+                const sendJumpRequest = (element, action = 'jump') => {
+                    const file = element.getAttribute('file');
+                    const line = element.getAttribute('line');
+                    console.log('[LuTeX] Double-click detected:', { file, line, action, element });
+                    if (!file || !line) {
+                        console.warn('[LuTeX] Element missing file or line attribute');
+                        return;
+                    }
+                    const url = `http://${listenerHost}:${listenerPort}`;
+                    const payload = { file, line, action };
+                    console.log('[LuTeX] Sending request to:', url, 'with payload:', payload);
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(response => {
+                        console.log('[LuTeX] Request successful:', response.status);
+                    })
+                    .catch(error => {
+                        console.error('[LuTeX] Error sending request:', error);
+                    });
+                };
+                
+                // Add double-click handler for desktop
+                document.addEventListener('dblclick', (e) => {
+                    let element = e.target;
+                    while (element && !element.hasAttribute('line')) {
+                        element = element.parentElement;
+                    }
+                    if (element) {
+                        sendJumpRequest(element);
+                    }
+                });
+            } else {
+                console.log('[LuTeX] Listener integration disabled:', { listenerPort, lutexListenerPort: window.lutexListenerPort });
             }
         }
 

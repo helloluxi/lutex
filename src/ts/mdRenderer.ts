@@ -75,10 +75,10 @@ export const renderMarkdown = (function() {
     }
     
     // Helper function to render paragraph content
-    function renderParaContent(paraLines: string[], markdownFileDir: string) {
+    function renderParaContent(paraLines: string[], markdownFileDir: string, startLine: number, markdownFile: string) {
         if (paraLines.length === 0) return '';
         
-        let tmpHtml = `<div class="para">`;
+        let tmpHtml = `<div class="para" file="${markdownFile}" line="${startLine + 1}">`;
         let lastListLevel = -1;
         let cachedLines: string[] = [];
 
@@ -152,18 +152,18 @@ export const renderMarkdown = (function() {
     }
     
     // Helper function to render heading with line attribute
-    function renderHeading(line: string, lineIndex: number) {
+    function renderHeading(line: string, lineIndex: number, markdownFile: string) {
         const trimmedLine = line.trim();
         
         if (trimmedLine.startsWith('# ')) {
             const headingText = trimmedLine.substring(2).trim();
-            return `<h1 line="${lineIndex}">${headingText}</h1>`;
+            return `<h1 file="${markdownFile}" line="${lineIndex + 1}">${headingText}</h1>`;
         } else if (trimmedLine.startsWith('## ')) {
             const headingText = trimmedLine.substring(3).trim();
-            return `<h2 line="${lineIndex}">${headingText}</h2>`;
+            return `<h2 file="${markdownFile}" line="${lineIndex + 1}">${headingText}</h2>`;
         } else if (trimmedLine.startsWith('### ')) {
             const headingText = trimmedLine.substring(4).trim();
-            return `<h3 line="${lineIndex}">${headingText}</h3>`;
+            return `<h3 file="${markdownFile}" line="${lineIndex + 1}">${headingText}</h3>`;
         }
         
         return '';
@@ -194,8 +194,10 @@ export const renderMarkdown = (function() {
                 markdownFileDir = markdownFilePath.substring(0, lastSlash + 1);
             }
         }
+        const markdownFile = markdownFilePath || '';
                 let html = '';
         let currentPara: string[] = [];
+        let currentParaStartLine = 0;
         let inCodeBlock = false;
         let codeBlockLang = '';
         let codeBlockLines: string[] = [];
@@ -216,7 +218,7 @@ export const renderMarkdown = (function() {
             if (trimmedLine.startsWith('```') && !inCodeBlock) {
                 // Start of code block
                 if (currentPara.length > 0) {
-                    html += renderParaContent(currentPara, markdownFileDir);
+                    html += renderParaContent(currentPara, markdownFileDir, currentParaStartLine, markdownFile);
                     currentPara = [];
                 }
                 inCodeBlock = true;
@@ -241,27 +243,30 @@ export const renderMarkdown = (function() {
             if (trimmedLine.match(/^#{1,3} /)) {
                 // Render any accumulated paragraph content first
                 if (currentPara.length > 0) {
-                    html += renderParaContent(currentPara, markdownFileDir);
+                    html += renderParaContent(currentPara, markdownFileDir, currentParaStartLine, markdownFile);
                     currentPara = [];
                 }
                 
                 // Render heading as direct child with line attribute
-                html += renderHeading(line, lineIndex);
+                html += renderHeading(line, lineIndex, markdownFile);
             } else if (trimmedLine === '') {
                 // Empty line - check if we should close current paragraph
                 if (currentPara.length > 0) {
-                    html += renderParaContent(currentPara, markdownFileDir);
+                    html += renderParaContent(currentPara, markdownFileDir, currentParaStartLine, markdownFile);
                     currentPara = [];
                 }
             } else {
                 // Regular content line - add to current paragraph
+                if (currentPara.length === 0) {
+                    currentParaStartLine = lineIndex;
+                }
                 currentPara.push(line);
             }
         }
         
         // Handle any remaining paragraph content
         if (currentPara.length > 0) {
-            html += renderParaContent(currentPara, markdownFileDir);
+            html += renderParaContent(currentPara, markdownFileDir, currentParaStartLine, markdownFile);
         }
         
         // Handle unclosed code block

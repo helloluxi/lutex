@@ -25,3 +25,7 @@ yarn.lock
 # Keep the compiled JavaScript files
 !out/**/*.js
 !res/dist/**/*.js
+
+# AI assistant files and memory
+.memory/**
+CLAUDE.md

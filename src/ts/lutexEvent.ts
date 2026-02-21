@@ -311,24 +311,35 @@ function setupScrollTracking() {
     const listenerPort = window.lutexListenerPort || lutex.localHostPort;
     
     if (listenerPort && listenerPort !== 0) {
+        console.log('[LuTeX] Listener integration enabled:', { listenerPort, hostname: window.location.hostname });
         // Use current hostname instead of hardcoding localhost for LAN support
         const listenerHost = window.location.hostname;
         
         // Function to send jump request
-        const sendJumpRequest = (element: Element) => {
+        const sendJumpRequest = (element: Element, action: string = 'jump') => {
             const file = element.getAttribute('file');
             const line = element.getAttribute('line');
-            if (!file || !line) return;
-            fetch(`http://${listenerHost}:${listenerPort}`, {
+            console.log('[LuTeX] Double-click detected:', { file, line, action, element });
+            if (!file || !line) {
+                console.warn('[LuTeX] Element missing file or line attribute');
+                return;
+            }
+            const url = `http://${listenerHost}:${listenerPort}`;
+            const payload = { file, line, action };
+            console.log('[LuTeX] Sending request to:', url, 'with payload:', payload);
+            fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    file,
-                    line
-                })
-            }).catch(error => console.error('Error sending line number:', error));
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                console.log('[LuTeX] Request successful:', response.status);
+            })
+            .catch(error => {
+                console.error('[LuTeX] Error sending request:', error);
+            });
         };
         
         // Add double-click handler for desktop
@@ -379,6 +390,8 @@ function setupScrollTracking() {
                 console.error('Error processing refresh event:', error);
             }
         });
+    } else {
+        console.log('[LuTeX] Listener integration disabled:', { listenerPort, lutexListenerPort: window.lutexListenerPort });
     }
 }
 

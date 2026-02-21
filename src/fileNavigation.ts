@@ -35,3 +35,44 @@ export function jumpToLine(fileName: string, lineNumber: number, outputChannel: 
         vscode.window.showErrorMessage(errorMsg);
     }
 }
+
+export function toggleCheckbox(fileName: string, lineNumber: number, outputChannel: vscode.OutputChannel): void {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+        const errorMsg = 'No workspace folder found';
+        outputChannel.appendLine(`[File Navigation] Error: ${errorMsg}`);
+        return;
+    }
+    
+    const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    const fullPath = path.join(workspaceRoot, fileName);
+    
+    if (fs.existsSync(fullPath)) {
+        const fileUri = vscode.Uri.file(fullPath);
+        outputChannel.appendLine(`[File Navigation] Toggling checkbox in: ${fileName} at line ${lineNumber}`);
+        vscode.workspace.openTextDocument(fileUri).then((document) => {
+            const line = document.lineAt(lineNumber - 1);
+            const lineText = line.text;
+            
+            // Toggle checkbox: [ ] <-> [x]
+            let newText = lineText;
+            if (lineText.includes('[ ]')) {
+                newText = lineText.replace('[ ]', '[x]');
+            } else if (lineText.includes('[x]')) {
+                newText = lineText.replace('[x]', '[ ]');
+            } else {
+                outputChannel.appendLine(`[File Navigation] No checkbox found at line ${lineNumber}`);
+                return;
+            }
+            
+            const edit = new vscode.WorkspaceEdit();
+            edit.replace(fileUri, line.range, newText);
+            vscode.workspace.applyEdit(edit).then(() => {
+                document.save();
+                outputChannel.appendLine(`[File Navigation] Successfully toggled checkbox at ${fileName}:${lineNumber}`);
+            });
+        });
+    } else {
+        const errorMsg = `Could not find file: ${fullPath}`;
+        outputChannel.appendLine(`[File Navigation] Error: ${errorMsg}`);
+    }
+}
