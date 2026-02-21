@@ -34,6 +34,14 @@ export async function renderMarkdownWithMath(markdown: string, element: HTMLElem
     } catch (error) {
         console.warn('Failed to render KaTeX:', error);
     }
+    
+    // Update document title from first h1 element
+    if (typeof document !== 'undefined') {
+        const h1Element = element.querySelector('h1');
+        if (h1Element && h1Element.textContent) {
+            document.title = h1Element.textContent.trim();
+        }
+    }
 }
 
 /**
