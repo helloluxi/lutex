@@ -89,11 +89,11 @@
                 
                 // Function to send jump request
                 const sendJumpRequest = (element, action = 'jump') => {
-                    const file = element.getAttribute('file');
+                    const file = window.lutexMarkdownFile;
                     const line = element.getAttribute('line');
                     console.log('[LuTeX] Double-click detected:', { file, line, action, element });
                     if (!file || !line) {
-                        console.warn('[LuTeX] Element missing file or line attribute');
+                        console.warn('[LuTeX] Missing file or line attribute');
                         return;
                     }
                     const url = `http://${listenerHost}:${listenerPort}`;

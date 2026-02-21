@@ -62,12 +62,9 @@ export const renderMarkdown = (function() {
         
         // Process images: ![alt](path) - must be before links since similar syntax
         processedLine = processedLine.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, imgPath) => {
-            // If path is relative (doesn't start with http:// or https:// or /), prepend markdown file directory
-            let resolvedPath = imgPath;
-            if (markdownFileDir && !/^(https?:\/\/|\/)/i.test(imgPath)) {
-                resolvedPath = markdownFileDir + imgPath;
-            }
-            return `<img src="${resolvedPath}" alt="${alt}">`;
+            // Use project-root-relative paths (paths already relative to project root)
+            // Allow absolute URLs (http://, https://) and absolute paths (/)
+            return `<img src="${imgPath}" alt="${alt}">`;
         });
         
         // Process markdown links: [text](url)
@@ -86,7 +83,7 @@ export const renderMarkdown = (function() {
     function renderParaContent(paraLines: string[], markdownFileDir: string, startLine: number, markdownFile: string) {
         if (paraLines.length === 0) return '';
         
-        let tmpHtml = `<div class="para" file="${markdownFile}" line="${startLine + 1}">`;
+        let tmpHtml = `<div class="para" line="${startLine + 1}">`;
         let lastListLevel = -1;
         let cachedLines: string[] = [];
 
@@ -165,13 +162,13 @@ export const renderMarkdown = (function() {
         
         if (trimmedLine.startsWith('# ')) {
             const headingText = trimmedLine.substring(2).trim();
-            return `<h1 file="${markdownFile}" line="${lineIndex + 1}">${headingText}</h1>`;
+            return `<h1 line="${lineIndex + 1}">${headingText}</h1>`;
         } else if (trimmedLine.startsWith('## ')) {
             const headingText = trimmedLine.substring(3).trim();
-            return `<h2 file="${markdownFile}" line="${lineIndex + 1}">${headingText}</h2>`;
+            return `<h2 line="${lineIndex + 1}">${headingText}</h2>`;
         } else if (trimmedLine.startsWith('### ')) {
             const headingText = trimmedLine.substring(4).trim();
-            return `<h3 file="${markdownFile}" line="${lineIndex + 1}">${headingText}</h3>`;
+            return `<h3 line="${lineIndex + 1}">${headingText}</h3>`;
         }
         
         return '';
