@@ -73,8 +73,8 @@ export const renderMarkdown = (function() {
         // Process strong text: **text**
         processedLine = processedLine.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
         
-        // Process URLs: automatically link https:// URLs
-        processedLine = processedLine.replace(/(https:\/\/[^\s<>]+)/g, '<a href="$1" target="_blank">$1</a>');
+        // Process URLs: automatically link https:// URLs (but skip if already in href attribute)
+        processedLine = processedLine.replace(/(?<!href="|src=")(https:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank">$1</a>');
         
         return processedLine;
     }
