@@ -62,13 +62,34 @@ export const renderMarkdown = (function() {
         
         // Process images: ![alt](path) - must be before links since similar syntax
         processedLine = processedLine.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, imgPath) => {
-            // Use project-root-relative paths (paths already relative to project root)
-            // Allow absolute URLs (http://, https://) and absolute paths (/)
-            return `<img src="${imgPath}" alt="${alt}">`;
+            let resolvedPath = imgPath;
+            if (!imgPath.match(/^https?:\/\//) && !imgPath.startsWith('/') && markdownFileDir) {
+                const parts = (markdownFileDir + imgPath).split('/');
+                const normalized: string[] = [];
+                for (const part of parts) {
+                    if (part === '..') normalized.pop();
+                    else if (part !== '.') normalized.push(part);
+                }
+                resolvedPath = normalized.join('/');
+            }
+            return `<img src="${resolvedPath}" alt="${alt}">`;
         });
         
         // Process markdown links: [text](url)
-        processedLine = processedLine.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+        processedLine = processedLine.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+            let resolvedUrl = url;
+            if (!url.match(/^https?:\/\//) && !url.startsWith('/') && markdownFileDir) {
+                // Resolve relative to file directory, then normalize (handle ../)
+                const parts = (markdownFileDir + url).split('/');
+                const normalized: string[] = [];
+                for (const part of parts) {
+                    if (part === '..') normalized.pop();
+                    else if (part !== '.') normalized.push(part);
+                }
+                resolvedUrl = normalized.join('/');
+            }
+            return `<a href="${resolvedUrl}" target="_blank">${text}</a>`;
+        });
         
         // Process strong text: **text**
         processedLine = processedLine.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
