@@ -48,7 +48,7 @@
         async function loadMarkdown() {
             const markdownFile = window.lutexMarkdownFile || 'main.md';
             try {
-                const response = await fetch(`./${markdownFile}`);
+                const response = await fetch(markdownFile.startsWith('/') ? markdownFile : `./${markdownFile}`);
                 if (!response.ok) {
                     throw new Error(`Failed to load ${markdownFile}: ${response.status} ${response.statusText}`);
                 }

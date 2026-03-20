@@ -1,0 +1,121 @@
+import * as http from 'http';
+import * as fs from 'fs';
+import * as path from 'path';
+
+function findAvailablePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const startPort = 12023;
+        let attemptCount = 0;
+        const tryPort = (port: number) => {
+            if (attemptCount++ >= 100) { reject(new Error('No available port found')); return; }
+            const s = http.createServer();
+            s.listen(port, 'localhost', () => s.close(() => resolve(port)));
+            s.on('error', () => tryPort(port + 1));
+        };
+        tryPort(startPort);
+    });
+}
+
+export class MdServerCli {
+    private server: http.Server;
+    private port: number | null = null;
+    private filePath: string;
+    private resourcesPath: string;
+    private distResourcesPath: string;
+
+    constructor(filePath: string) {
+        this.filePath = path.resolve(filePath);
+        this.resourcesPath = path.join(__dirname, '../../res/md');
+        this.distResourcesPath = path.join(__dirname, '../../res/dist');
+        this.server = this.createServer();
+    }
+
+    private createServer(): http.Server {
+        return http.createServer((req, res) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+            if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+            if (req.method === 'GET') { this.handleGetRequest(req, res); }
+            else { res.writeHead(405); res.end('Method not allowed'); }
+        });
+    }
+
+    private handleGetRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+        if (!req.url) { res.writeHead(400); res.end(); return; }
+
+        const url = new URL(req.url, `http://localhost:${this.port}`);
+        const pathname = url.pathname;
+
+        let filePath: string;
+        let contentType: string;
+
+        if (pathname === '/' || pathname === '/index.html') {
+            this.serveIndexHtml(url.searchParams.get('m') ?? 'dark', res);
+            return;
+        } else if (pathname.startsWith('/dist/')) {
+            filePath = path.join(this.distResourcesPath, pathname.substring(6));
+            contentType = 'application/javascript';
+        } else if (pathname.endsWith('.css')) {
+            filePath = path.join(this.resourcesPath, path.basename(pathname));
+            contentType = 'text/css';
+        } else {
+            // Absolute filesystem path — used for .md files and images resolved by mdRenderer
+            filePath = pathname;
+            contentType = this.getContentType(pathname);
+        }
+
+        if (!fs.existsSync(filePath)) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('File not found: ' + filePath);
+            return;
+        }
+
+        fs.readFile(filePath, (err, data) => {
+            if (err) { res.writeHead(500); res.end('Internal server error'); return; }
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(data);
+        });
+    }
+
+    private getContentType(filePath: string): string {
+        const ext = path.extname(filePath).toLowerCase();
+        const map: { [key: string]: string } = {
+            '.md': 'text/markdown',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.svg': 'image/svg+xml',
+            '.bmp': 'image/bmp',
+            '.webp': 'image/webp',
+        };
+        return map[ext] ?? 'application/octet-stream';
+    }
+
+    private serveIndexHtml(themeMode: string, res: http.ServerResponse): void {
+        const indexPath = path.join(this.resourcesPath, 'index.html');
+        fs.readFile(indexPath, 'utf8', (err, data) => {
+            if (err) { res.writeHead(500); res.end('Internal server error'); return; }
+
+            const configScript = `<script>
+        window.lutexMarkdownFile = '${this.filePath}';
+        window.lutexDefaultTheme = '${themeMode}';
+    </script>
+    <script>`;
+
+            const html = data.replace('<script>', configScript);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(html);
+        });
+    }
+
+    public async start(): Promise<number> {
+        const port = await findAvailablePort();
+        return new Promise((resolve, reject) => {
+            this.server.listen(port, 'localhost', () => {
+                this.port = port;
+                resolve(port);
+            }).on('error', reject);
+        });
+    }
+}

@@ -11,6 +11,29 @@ Real-time interactive LaTeX and Markdown renderers in HTML.
    - `LuTeX: Launch LuTeX Renderer with Listener` for LaTeX
    - `LuTeX: Launch Markdown Renderer with Listener` for Markdown
 
+## CLI Install (Linux)
+
+```bash
+npm run compile:cli && npm run compile:res
+mkdir -p ~/.local/bin
+ln -sf $(pwd)/out/cli/md.js ~/.local/bin/md
+chmod +x out/cli/md.js
+```
+
+Ensure `~/.local/bin` is in your PATH (add to `.bashrc` if not):
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Then open any markdown file in the browser:
+
+```bash
+md /path/to/file.md
+```
+
+To uninstall: `rm ~/.local/bin/md`
+
 ## Commands
 
 | Command | Description |

@@ -139,11 +139,15 @@
     "type": "git",
     "url": "https://github.com/helloluxi/lutex-ext"
   },
+  "bin": {
+    "md": "./out/cli/md.js"
+  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "npm run compile:extension && npm run compile:res",
     "compile:extension": "tsc -p ./tsconfig.json",
     "compile:res": "tsc -p ./tsconfig.res.json",
+    "compile:cli": "tsc -p ./tsconfig.cli.json",
     "watch": "npm run watch:extension & npm run watch:res",
     "watch:extension": "tsc -watch -p ./tsconfig.json",
     "watch:res": "tsc -watch -p ./tsconfig.res.json",
