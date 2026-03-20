@@ -124,7 +124,8 @@ export const renderMarkdown = (function() {
             cachedLines = [];
         };
 
-        for (let line of paraLines) {
+        for (let i = 0; i < paraLines.length; i++) {
+            const line = paraLines[i];
             let trimmedLine = line.trim();
             
             if (trimmedLine.startsWith('+ ') || trimmedLine.startsWith('- ')) {
@@ -156,9 +157,9 @@ export const renderMarkdown = (function() {
                 // Add number for + items, keep - items as is
                 const processedLine = processInlineMarkdown(trimmedLine, markdownFileDir);
                 if (line.trim().startsWith('+ ')) {
-                    tmpHtml += `<li>${globalNumberCounter++}. ${processedLine}</li>`;
+                    tmpHtml += `<li line="${startLine + i + 1}">${globalNumberCounter++}. ${processedLine}</li>`;
                 } else {
-                    tmpHtml += `<li>${processedLine}</li>`;
+                    tmpHtml += `<li line="${startLine + i + 1}">${processedLine}</li>`;
                 }
                 lastListLevel = thisListLevel;
                 continue;
@@ -209,6 +210,40 @@ export const renderMarkdown = (function() {
         return `<pre><code class="lang-${language}">${escapeHtml(codeContent)}</code></pre>`;
     }
     
+    // Helper function to parse a table row into cells
+    function parseTableRow(line: string): string[] {
+        return line.split('|').slice(1, -1).map(cell => cell.trim());
+    }
+
+    // Helper function to render a table block
+    function renderTable(tableLines: string[], startLine: number, markdownFileDir: string): string {
+        if (tableLines.length < 2) return '';
+
+        const headerCells = parseTableRow(tableLines[0]);
+        let html = `<table>`;
+        html += `<thead><tr line="${startLine + 1}">`;
+        for (const cell of headerCells) {
+            html += `<th style="text-align:center">${processInlineMarkdown(cell, markdownFileDir)}</th>`;
+        }
+        html += `</tr></thead>`;
+
+        if (tableLines.length > 2) {
+            html += `<tbody>`;
+            for (let i = 2; i < tableLines.length; i++) {
+                const cells = parseTableRow(tableLines[i]);
+                html += `<tr line="${startLine + i + 1}">`;
+                for (const cell of cells) {
+                    html += `<td style="text-align:center">${processInlineMarkdown(cell, markdownFileDir)}</td>`;
+                }
+                html += `</tr>`;
+            }
+            html += `</tbody>`;
+        }
+
+        html += `</table>`;
+        return html;
+    }
+
     // Main rendering function
     return function(lines: string[], markdownFilePath?: string): string {
         if (!lines || lines.length === 0) return '';
@@ -227,6 +262,9 @@ export const renderMarkdown = (function() {
         let inCodeBlock = false;
         let codeBlockLang = '';
         let codeBlockLines: string[] = [];
+        let inTable = false;
+        let tableLines: string[] = [];
+        let tableStartLine = 0;
         globalNumberCounter = 1;
         
         // Main rendering loop
@@ -265,6 +303,25 @@ export const renderMarkdown = (function() {
                 continue;
             }
             
+            // Handle table lines
+            if (/^\|.*\|/.test(trimmedLine)) {
+                if (!inTable) {
+                    if (currentPara.length > 0) {
+                        html += renderParaContent(currentPara, markdownFileDir, currentParaStartLine, markdownFile);
+                        currentPara = [];
+                    }
+                    inTable = true;
+                    tableStartLine = lineIndex;
+                    tableLines = [];
+                }
+                tableLines.push(trimmedLine);
+                continue;
+            } else if (inTable) {
+                html += renderTable(tableLines, tableStartLine, markdownFileDir);
+                inTable = false;
+                tableLines = [];
+            }
+
             // Check if line is a heading (h1, h2, h3)
             if (trimmedLine.match(/^#{1,3} /)) {
                 // Render any accumulated paragraph content first
@@ -290,6 +347,11 @@ export const renderMarkdown = (function() {
             }
         }
         
+        // Handle any remaining table
+        if (inTable && tableLines.length > 0) {
+            html += renderTable(tableLines, tableStartLine, markdownFileDir);
+        }
+
         // Handle any remaining paragraph content
         if (currentPara.length > 0) {
             html += renderParaContent(currentPara, markdownFileDir, currentParaStartLine, markdownFile);
