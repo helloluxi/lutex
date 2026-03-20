@@ -55,8 +55,13 @@ export class ListenerServer {
                 if (file && typeof file === 'string' && lineNumber > 0) {
                     if (action === 'check') {
                         toggleCheckbox(file, lineNumber, this.outputChannel);
-                    } else {
+                    } else if (action === 'jump') {
                         jumpToLine(file, lineNumber, this.outputChannel);
+                    } else {
+                        this.outputChannel.appendLine(`[Listener Server] Unknown action: ${action}`);
+                        res.writeHead(400, { 'Content-Type': 'text/plain' });
+                        res.end('Unknown action');
+                        return;
                     }
                     res.writeHead(200, { 'Content-Type': 'text/plain' });
                     res.end('Success');

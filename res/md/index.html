@@ -58,15 +58,49 @@
             }
         }
 
+        // Setup click handler for file links when listener port is active
+        function setupLinkClickHandler() {
+            const listenerPort = window.lutexListenerPort;
+            if (!listenerPort || listenerPort === 0) return;
+
+            const listenerHost = window.location.hostname;
+
+            document.addEventListener('click', (e) => {
+                const anchor = e.target.closest('a');
+                if (!anchor) return;
+
+                const href = anchor.getAttribute('href');
+                if (!href || href.startsWith('http://') || href.startsWith('https://')) return;
+
+                e.preventDefault();
+
+                if (href.endsWith('.md')) {
+                    // Navigate to same md server with updated file param
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('f', href);
+                    window.location.href = url.toString();
+                } else {
+                    // Send jump-to-line-1 request to listener port for other file links
+                    fetch(`http://${listenerHost}:${listenerPort}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file: href, line: 1, action: 'jump' })
+                    }).catch(error => console.error('[LuTeX] Error sending jump request:', error));
+                }
+            });
+        }
+
         async function init() {
             const contentElement = document.getElementById('mainContainer');
             try {
                 const markdownFile = window.lutexMarkdownFile || 'main.md';
                 const markdown = await loadMarkdown();
                 await renderMarkdownWithMath(markdown, contentElement, katexMacros, markdownFile);
-                
+
                 // Setup double-click handler for jump-to-source
                 setupDoubleClickHandler();
+                // Setup click handler for file links
+                setupLinkClickHandler();
             } catch (error) {
                 console.error('Error loading content:', error);
                 contentElement.innerHTML = `
@@ -122,6 +156,18 @@
                     }
                     if (element) {
                         sendJumpRequest(element);
+                    }
+                });
+
+                // Add click handler for checkboxes
+                document.addEventListener('click', (e) => {
+                    if (e.target.type !== 'checkbox') return;
+                    let element = e.target.parentElement;
+                    while (element && !element.hasAttribute('line')) {
+                        element = element.parentElement;
+                    }
+                    if (element) {
+                        sendJumpRequest(element, 'check');
                     }
                 });
             } else {
