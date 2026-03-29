@@ -22,6 +22,7 @@ export class MdServerCli {
     private filePath: string;
     private resourcesPath: string;
     private distResourcesPath: string;
+    private sseClients: Set<http.ServerResponse> = new Set();
 
     constructor(filePath: string) {
         this.filePath = path.resolve(filePath);
@@ -41,6 +42,23 @@ export class MdServerCli {
         });
     }
 
+    private handleSseRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        });
+        res.write('data: {"type":"connected"}\n\n');
+        this.sseClients.add(res);
+        req.on('close', () => {
+            this.sseClients.delete(res);
+            if (this.sseClients.size === 0) {
+                this.server.close();
+                process.exit(0);
+            }
+        });
+    }
+
     private handleGetRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
         if (!req.url) { res.writeHead(400); res.end(); return; }
 
@@ -52,6 +70,9 @@ export class MdServerCli {
 
         if (pathname === '/' || pathname === '/index.html') {
             this.serveIndexHtml(url.searchParams.get('m') ?? 'dark', res);
+            return;
+        } else if (pathname === '/event') {
+            this.handleSseRequest(req, res);
             return;
         } else if (pathname.startsWith('/dist/')) {
             filePath = path.join(this.distResourcesPath, pathname.substring(6));
@@ -100,6 +121,7 @@ export class MdServerCli {
             const configScript = `<script>
         window.lutexMarkdownFile = '${this.filePath}';
         window.lutexDefaultTheme = '${themeMode}';
+        new EventSource('/event');
     </script>
     <script>`;
 
