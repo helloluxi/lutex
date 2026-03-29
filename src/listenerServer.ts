@@ -101,10 +101,13 @@ export class ListenerServer {
         });
     }
 
-    public notifyRefresh(): void {
+    public notifyRefresh(file?: string): void {
+        const message = file
+            ? JSON.stringify({ type: 'refresh', file })
+            : '{"type":"refresh"}';
         this.connectedClients.forEach(client => {
             try {
-                client.write('data: {"type":"refresh"}\n\n');
+                client.write(`data: ${message}\n\n`);
             } catch (error) {
                 // Silently remove failed clients
                 this.connectedClients.delete(client);

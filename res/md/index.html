@@ -97,6 +97,18 @@
                 const markdown = await loadMarkdown();
                 await renderMarkdownWithMath(markdown, contentElement, katexMacros, markdownFile);
 
+                // Restore scroll to saved h2/h3 section after render
+                const savedHeading = localStorage.getItem('mdScrollHeading');
+                if (savedHeading !== null) {
+                    localStorage.removeItem('mdScrollHeading');
+                    for (const h of document.querySelectorAll('h2, h3')) {
+                        if (h.textContent.trim() === savedHeading) {
+                            h.scrollIntoView({ behavior: 'instant', block: 'start' });
+                            break;
+                        }
+                    }
+                }
+
                 // Setup double-click handler for jump-to-source
                 setupDoubleClickHandler();
                 // Setup click handler for file links
@@ -194,9 +206,16 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'refresh') {
-                        // Save scroll position before refresh
-                        const scrollY = window.scrollY;
-                        localStorage.setItem('mdScrollPosition', scrollY.toString());
+                        const thisFile = window.lutexMarkdownFile || 'main.md';
+                        if (data.file && data.file !== thisFile) return;
+                        // Save current h2/h3 section before reloading
+                        const headings = [...document.querySelectorAll('h2, h3')];
+                        const active = headings.findLast(h => h.getBoundingClientRect().top <= 1);
+                        if (active) {
+                            localStorage.setItem('mdScrollHeading', active.textContent.trim());
+                        } else {
+                            localStorage.removeItem('mdScrollHeading');
+                        }
                         location.reload();
                     } else if (data.type === 'close') {
                         // Server is shutting down, close the window/tab
@@ -210,16 +229,6 @@
                 }
             });
         }
-
-        // Restore scroll position after page load
-        window.addEventListener('load', () => {
-            const savedScrollY = localStorage.getItem('mdScrollPosition');
-            if (savedScrollY !== null) {
-                window.scrollTo(0, parseInt(savedScrollY, 10));
-                // Clear the saved position after restoring
-                localStorage.removeItem('mdScrollPosition');
-            }
-        });
 
         // Initialize when DOM is ready
         if (document.readyState === 'loading') {

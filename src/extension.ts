@@ -45,9 +45,13 @@ export function activate(context: vscode.ExtensionContext) {
     });
     
     const mdFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.md');
-    mdFileWatcher.onDidChange(() => {
+    mdFileWatcher.onDidChange((uri) => {
         if (listenerServer.isRunning() && (mdRendererServer.isRunning() || slidesRendererServer.isRunning())) {
-            listenerServer.notifyRefresh();
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            const relPath = workspaceFolder
+                ? path.relative(workspaceFolder.uri.fsPath, uri.fsPath).replace(/\\/g, '/')
+                : undefined;
+            listenerServer.notifyRefresh(relPath);
         }
     });
     
