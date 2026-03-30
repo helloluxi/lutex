@@ -121,7 +121,8 @@ export class MdServerCli {
             const configScript = `<script>
         window.lutexMarkdownFile = '${this.filePath}';
         window.lutexDefaultTheme = '${themeMode}';
-        new EventSource('/event');
+        const _es = new EventSource('/event');
+        _es.addEventListener('message', e => { try { if (JSON.parse(e.data).type === 'close') window.close(); } catch {} });
     </script>
     <script>`;
 
@@ -129,6 +130,12 @@ export class MdServerCli {
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(html);
         });
+    }
+
+    public broadcastShutdown(): void {
+        for (const client of this.sseClients) {
+            client.write('data: {"type":"close"}\n\n');
+        }
     }
 
     public async start(): Promise<number> {

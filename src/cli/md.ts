@@ -29,6 +29,11 @@ async function main() {
     } catch {
         // browser open failed, URL is printed above
     }
+
+    process.on('SIGINT', () => {
+        server.broadcastShutdown();
+        setTimeout(() => process.exit(0), 200);
+    });
 }
 
 main().catch(console.error);

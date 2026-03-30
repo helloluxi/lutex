@@ -34,7 +34,12 @@ export async function renderMarkdownWithMath(markdown: string, element: HTMLElem
     } catch (error) {
         console.warn('Failed to render KaTeX:', error);
     }
-    
+
+    // Highlight code blocks
+    if (typeof (window as any).Prism !== 'undefined') {
+        (window as any).Prism.highlightAllUnder(element);
+    }
+
     // Update document title from first h1 element
     if (typeof document !== 'undefined') {
         const h1Element = element.querySelector('h1');
@@ -207,7 +212,7 @@ export const renderMarkdown = (function() {
     // Helper function to render code block
     function renderCodeBlock(codeLines: string[], language: string) {
         const codeContent = codeLines.join('\n');
-        return `<pre><code class="lang-${language}">${escapeHtml(codeContent)}</code></pre>`;
+        return `<pre><code class="language-${language}">${escapeHtml(codeContent)}</code></pre>`;
     }
     
     // Helper function to parse a table row into cells

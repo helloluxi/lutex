@@ -6,9 +6,13 @@
     <title>Markdown Viewer</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <link rel="stylesheet" id="prism-theme-dark" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" id="prism-theme-light" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" disabled>
     <link rel="stylesheet" href="md.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script>
         window.katexReady = Promise.resolve();
     </script>
@@ -33,6 +37,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const themeFromUrl = urlParams.get('m') || 'dark'; // Default to dark if not specified
         themeManager.setTheme(themeFromUrl);
+        syncPrismTheme(themeFromUrl);
         if (window.lutexDefaultTheme) {
             delete window.lutexDefaultTheme;
         }
@@ -187,12 +192,18 @@
             }
         }
 
+        function syncPrismTheme(theme) {
+            document.getElementById('prism-theme-dark').disabled = (theme === 'light');
+            document.getElementById('prism-theme-light').disabled = (theme !== 'light');
+        }
+
         // Add keyboard listener for 'M' key to toggle theme
         document.addEventListener('keydown', (event) => {
             if (event.key === 'm' || event.key === 'M') {
                 themeManager.toggle();
-                // Update URL parameter to match new theme
-                updateUrlThemeParam(themeManager.getCurrentTheme());
+                const newTheme = themeManager.getCurrentTheme();
+                updateUrlThemeParam(newTheme);
+                syncPrismTheme(newTheme);
             }
         });
 
