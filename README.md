@@ -63,10 +63,14 @@ Configure the managed patterns in your workspace settings:
 
 ```json
 "lutex.sidecar.excludeRules": [
-  {"**/*.py.md": true},
-  {"**/*.yaml.md": true},
-  {"**/*.yml.md": true},
-  {"**/*.sh.md": true}
+  "**/*.py.md",
+  "**/*.cs.md",
+  "**/*.cpp.md",
+  "**/*.cu.md",
+  "**/*.c.md",
+  "**/*.h.md",
+  "**/*.js.md",
+  "**/*.ts.md"
 ]
 ```
 

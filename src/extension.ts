@@ -12,24 +12,9 @@ import { checkMainTexExists } from './tools';
 import { generateSlidePDF } from './slidesToPdf';
 
 type SidecarExcludeValue = boolean | Record<string, unknown>;
-type SidecarExcludeRule = Record<string, SidecarExcludeValue>;
-
-function normalizeSidecarExcludeRules(rules: SidecarExcludeRule[]): Record<string, SidecarExcludeValue> {
-    const normalized: Record<string, SidecarExcludeValue> = {};
-
-    for (const rule of rules) {
-        for (const [pattern, value] of Object.entries(rule)) {
-            normalized[pattern] = value;
-        }
-    }
-
-    return normalized;
-}
-
-function getConfiguredSidecarExcludeRules(): Record<string, SidecarExcludeValue> {
+function getConfiguredSidecarExcludeRules(): string[] {
     const config = vscode.workspace.getConfiguration('lutex.sidecar');
-    const rules = config.get<SidecarExcludeRule[]>('excludeRules') ?? [];
-    return normalizeSidecarExcludeRules(rules);
+    return config.get<string[]>('excludeRules') ?? [];
 }
 
 function getWorkspaceFilesExclude(): Record<string, SidecarExcludeValue> {
@@ -371,8 +356,7 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        const managedRules = getConfiguredSidecarExcludeRules();
-        const managedPatterns = Object.keys(managedRules);
+        const managedPatterns = getConfiguredSidecarExcludeRules();
 
         if (managedPatterns.length === 0) {
             vscode.window.showInformationMessage('No sidecar rules configured in lutex.sidecar.excludeRules.');
@@ -387,8 +371,8 @@ export function activate(context: vscode.ExtensionContext) {
                 delete nextFilesExclude[pattern];
             }
         } else {
-            for (const [pattern, value] of Object.entries(managedRules)) {
-                nextFilesExclude[pattern] = value;
+            for (const pattern of managedPatterns) {
+                nextFilesExclude[pattern] = true;
             }
         }
 
