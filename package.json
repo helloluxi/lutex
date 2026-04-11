@@ -27,11 +27,6 @@
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.texNormalization",
-        "title": "Tex Normalization",
-        "category": "LuTeX"
-      },
-      {
         "command": "lutex-ext.launchLutexWithListener",
         "title": "Launch LuTeX Renderer with Listener",
         "category": "LuTeX"

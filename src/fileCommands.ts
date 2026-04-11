@@ -93,46 +93,8 @@ export function registerFileCommands(context: vscode.ExtensionContext, outputCha
         vscode.window.showErrorMessage(`Please select text with one of these formats: ${supportedFormats}`);
     });
 
-    // Register the 'Tex Normalization' command
-    const texNormalizationCommand = vscode.commands.registerCommand('lutex-ext.texNormalization', () => {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            outputChannel.appendLine('[Tex Normalization] No active editor found');
-            vscode.window.showErrorMessage('No active editor found');
-            return;
-        }
-
-        const document = editor.document;
-        const fullRange = new vscode.Range(
-            document.positionAt(0),
-            document.positionAt(document.getText().length)
-        );
-        const fullText = document.getText();
-
-        // Replace all occurrences of {text> with {text}
-        const normalizedText = fullText.replace(/\{([a-zA-Z]+)>/g, '{$1}');
-        
-        // Count the number of replacements made
-        const matches = fullText.match(/\{([a-zA-Z]+)>/g);
-        const replacementCount = matches ? matches.length : 0;
-
-        if (replacementCount > 0) {
-            // Apply the changes to the document
-            editor.edit(editBuilder => {
-                editBuilder.replace(fullRange, normalizedText);
-            });
-
-            outputChannel.appendLine(`[Tex Normalization] Replaced ${replacementCount} occurrence(s) of {text> with {text}`);
-            vscode.window.showInformationMessage(`Tex Normalization: ${replacementCount} replacement(s) made`);
-        } else {
-            outputChannel.appendLine(`[Tex Normalization] No {text> patterns found to replace`);
-            vscode.window.showInformationMessage('Tex Normalization: No patterns found to replace');
-        }
-    });
-
     // Add the commands to the context subscriptions
     context.subscriptions.push(inlineToDisplayCommand);
-    context.subscriptions.push(texNormalizationCommand);
 }
 
 // Export the patterns for potential use elsewhere
