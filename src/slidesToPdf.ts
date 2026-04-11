@@ -148,7 +148,7 @@ async function showDependencyError(
     if (selection === 'Install Chrome') {
         vscode.env.openExternal(vscode.Uri.parse('https://www.google.com/chrome/'));
     } else if (selection === 'Open Settings') {
-        vscode.commands.executeCommand('workbench.action.openSettings', 'lutex-ext.chromePath');
+        vscode.commands.executeCommand('workbench.action.openSettings', 'lutex.chromePath');
     } else if (selection === 'Copy Install Command') {
         let command: string;
         if (missing === 'puppeteer') {

@@ -12,7 +12,7 @@ interface SimilarPair {
 }
 
 export function registerBibtexCommands(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel): void {
-    const bibtexCleanCommand = vscode.commands.registerCommand('lutex-ext.bibtexClean', async () => {
+    const bibtexCleanCommand = vscode.commands.registerCommand('lutex.bibtexClean', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             outputChannel.appendLine('[BibTeX Clean] No active editor found');

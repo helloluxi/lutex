@@ -13,7 +13,7 @@ export class StatusBarManager {
 
     constructor() {
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-        this.statusBarItem.command = 'lutex-ext.showStatus';
+        this.statusBarItem.command = 'lutex.showStatus';
         this.updateStatusBar();
         this.statusBarItem.show();
     }

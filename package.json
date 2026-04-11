@@ -17,81 +17,91 @@
   "contributes": {
     "commands": [
       {
-        "command": "lutex-ext.inlineToDisplay",
+        "command": "lutex.inlineToDisplay",
         "title": "Inline to display",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.bibtexClean",
+        "command": "lutex.bibtexClean",
         "title": "BibTeX Clean",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.launchLutexWithListener",
+        "command": "lutex.launchLutexWithListener",
         "title": "Launch LuTeX Renderer with Listener",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.launchMarkdownWithListener",
+        "command": "lutex.launchMarkdownWithListener",
         "title": "Launch Markdown Renderer with Listener",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.launchSlidesWithListener",
+        "command": "lutex.launchSlidesWithListener",
         "title": "Launch Slides Renderer with Listener",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.launchListener",
+        "command": "lutex.launchListener",
         "title": "Launch Listener Only",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.closeAll",
+        "command": "lutex.closeAll",
         "title": "Close All",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.jumpToHtml",
+        "command": "lutex.jumpToHtml",
         "title": "Jump to HTML Element",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.jumpToSlides",
+        "command": "lutex.jumpToSlides",
         "title": "Jump to Slides (Current Line)",
         "category": "LuTeX"
       },
       {
-        "command": "lutex-ext.exportSlidesToPdf",
+        "command": "lutex.exportSlidesToPdf",
         "title": "Export Slides to PDF",
         "category": "LuTeX",
         "enablement": "lutexSlidesRendererActive"
+      },
+      {
+        "command": "lutex.sidecar.toggleVisibility",
+        "title": "Sidecar: Toggle Visibility"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "lutex.sidecar.toggleVisibility",
+        "key": "ctrl+shift+alt+d"
       }
     ],
     "configuration": {
       "title": "LuTeX",
       "properties": {
-        "lutex-ext.rendererPort": {
+        "lutex.rendererPort": {
           "type": "number",
           "default": 0,
           "description": "Port number for the LuTeX renderer server (0 = auto-detect)",
           "minimum": 0,
           "maximum": 65535
         },
-        "lutex-ext.listenerPort": {
+        "lutex.listenerPort": {
           "type": "number",
           "default": 0,
           "description": "Port number for the line jumping listener server (0 = auto-detect)",
           "minimum": 0,
           "maximum": 65535
         },
-        "lutex-ext.theme": {
+        "lutex.theme": {
           "type": "string",
           "enum": ["light", "dark"],
           "default": "dark",
           "description": "Default theme for the LuTeX renderer"
         },
-        "lutex-ext.katexMacros": {
+        "lutex.katexMacros": {
           "type": "object",
           "default": {
             "\\ket": "\\lvert #1 \\rangle",
@@ -104,13 +114,13 @@
             "type": "string"
           }
         },
-        "lutex-ext.chromePath": {
+        "lutex.chromePath": {
           "type": "string",
           "default": "",
           "description": "Path to Chrome/Chromium executable for PDF generation. Leave empty to auto-detect. Example: C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
           "scope": "machine"
         },
-        "lutex-ext.autoLaunch": {
+        "lutex.autoLaunch": {
           "type": "string",
           "enum": ["none", "slides", "tex", "listener"],
           "default": "none",
@@ -122,10 +132,29 @@
             "Launch listener only on startup"
           ]
         },
-        "lutex-ext.allowLAN": {
+        "lutex.allowLAN": {
           "type": "boolean",
           "default": false,
           "description": "Allow access from LAN by binding servers to 0.0.0.0 instead of localhost"
+        },
+        "lutex.sidecar.excludeRules": {
+          "type": "array",
+          "default": [],
+          "description": "Workspace file exclusion rules toggled by the Sidecar: Toggle Visibility command.",
+          "items": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object"
+                }
+              ]
+            }
+          }
         }
       }
     }

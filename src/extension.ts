@@ -6,10 +6,36 @@ import { ListenerServer } from './listenerServer';
 import { TexServer } from './texServer';
 import { MdServer } from './mdServer';
 import { SdServer } from './sdServer';
-import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings, getAutoLaunchFromSettings, getPdfExportDateFromSettings, getAllowLANFromSettings } from './settings';
+import { getRendererPortFromSettings, getListenerPortFromSettings, getThemeFromSettings, getChromePathFromSettings, getAutoLaunchFromSettings, getPdfExportDateFromSettings } from './settings';
 import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
 import { generateSlidePDF } from './slidesToPdf';
+
+type SidecarExcludeValue = boolean | Record<string, unknown>;
+type SidecarExcludeRule = Record<string, SidecarExcludeValue>;
+
+function normalizeSidecarExcludeRules(rules: SidecarExcludeRule[]): Record<string, SidecarExcludeValue> {
+    const normalized: Record<string, SidecarExcludeValue> = {};
+
+    for (const rule of rules) {
+        for (const [pattern, value] of Object.entries(rule)) {
+            normalized[pattern] = value;
+        }
+    }
+
+    return normalized;
+}
+
+function getConfiguredSidecarExcludeRules(): Record<string, SidecarExcludeValue> {
+    const config = vscode.workspace.getConfiguration('lutex.sidecar');
+    const rules = config.get<SidecarExcludeRule[]>('excludeRules') ?? [];
+    return normalizeSidecarExcludeRules(rules);
+}
+
+function getWorkspaceFilesExclude(): Record<string, SidecarExcludeValue> {
+    const filesConfig = vscode.workspace.getConfiguration('files');
+    return filesConfig.get<Record<string, SidecarExcludeValue>>('exclude') ?? {};
+}
 
 export function activate(context: vscode.ExtensionContext) {
     // Create a dedicated output channel for LuTeX
@@ -60,7 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register commands
     
     // Launch LuTeX Renderer with Listener
-    const launchLutexWithListenerCommand = vscode.commands.registerCommand('lutex-ext.launchLutexWithListener', async () => {
+    const launchLutexWithListenerCommand = vscode.commands.registerCommand('lutex.launchLutexWithListener', async () => {
         try {
             // Start listener first if not already running
             if (!listenerServer.isRunning()) {
@@ -137,7 +163,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Launch Markdown Renderer with Listener
-    const launchMarkdownWithListenerCommand = vscode.commands.registerCommand('lutex-ext.launchMarkdownWithListener', async () => {
+    const launchMarkdownWithListenerCommand = vscode.commands.registerCommand('lutex.launchMarkdownWithListener', async () => {
         try {
             // Get the active markdown file
             const editor = vscode.window.activeTextEditor;
@@ -229,7 +255,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Launch Slides Renderer with Listener
-    const launchSlidesWithListenerCommand = vscode.commands.registerCommand('lutex-ext.launchSlidesWithListener', async () => {
+    const launchSlidesWithListenerCommand = vscode.commands.registerCommand('lutex.launchSlidesWithListener', async () => {
         try {
             // Get the active markdown file
             const editor = vscode.window.activeTextEditor;
@@ -315,7 +341,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Launch Listener Only
-    const launchListenerCommand = vscode.commands.registerCommand('lutex-ext.launchListener', async () => {
+    const launchListenerCommand = vscode.commands.registerCommand('lutex.launchListener', async () => {
         try {
             if (listenerServer.isRunning()) {
                 const port = listenerServer.getPort();
@@ -339,8 +365,46 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    const toggleSidecarVisibilityCommand = vscode.commands.registerCommand('lutex.sidecar.toggleVisibility', async () => {
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('Open a workspace folder before toggling sidecar visibility.');
+            return;
+        }
+
+        const managedRules = getConfiguredSidecarExcludeRules();
+        const managedPatterns = Object.keys(managedRules);
+
+        if (managedPatterns.length === 0) {
+            vscode.window.showInformationMessage('No sidecar rules configured in lutex.sidecar.excludeRules.');
+            return;
+        }
+
+        const enabled = context.workspaceState.get<boolean>('lutex.sidecar.enabled', false);
+        const nextFilesExclude = { ...getWorkspaceFilesExclude() };
+
+        if (enabled) {
+            for (const pattern of managedPatterns) {
+                delete nextFilesExclude[pattern];
+            }
+        } else {
+            for (const [pattern, value] of Object.entries(managedRules)) {
+                nextFilesExclude[pattern] = value;
+            }
+        }
+
+        try {
+            await vscode.workspace.getConfiguration('files').update('exclude', nextFilesExclude, vscode.ConfigurationTarget.Workspace);
+            await context.workspaceState.update('lutex.sidecar.enabled', !enabled);
+            vscode.window.showInformationMessage(enabled ? 'Sidecar visibility enabled.' : 'Sidecar visibility hidden.');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to toggle sidecar visibility: ${errorMessage}`);
+            outputChannel.appendLine(`[LuTeX] Toggle sidecar visibility error: ${errorMessage}`);
+        }
+    });
+
     // Close All
-    const closeAllCommand = vscode.commands.registerCommand('lutex-ext.closeAll', () => {
+    const closeAllCommand = vscode.commands.registerCommand('lutex.closeAll', () => {
         let stopped: string[] = [];
         
         if (texRendererServer.isRunning()) {
@@ -382,7 +446,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Jump to HTML element based on current cursor position
-    const jumpToHtmlCommand = vscode.commands.registerCommand('lutex-ext.jumpToHtml', async () => {
+    const jumpToHtmlCommand = vscode.commands.registerCommand('lutex.jumpToHtml', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             outputChannel.appendLine('[LuTeX] No active editor');
@@ -405,7 +469,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Jump to Slides (slides renderer or static page connected to listener)
-    const jumpToSlidesCommand = vscode.commands.registerCommand('lutex-ext.jumpToSlides', async () => {
+    const jumpToSlidesCommand = vscode.commands.registerCommand('lutex.jumpToSlides', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             outputChannel.appendLine('[LuTeX] No active editor');
@@ -429,7 +493,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 
     // Export Slides to PDF
-    const exportSlidesToPdfCommand = vscode.commands.registerCommand('lutex-ext.exportSlidesToPdf', async () => {
+    const exportSlidesToPdfCommand = vscode.commands.registerCommand('lutex.exportSlidesToPdf', async () => {
         try {
             // Check if slides renderer is running
             if (!slidesRendererServer.isRunning()) {
@@ -604,7 +668,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Status bar click command - show quick pick menu
-    const showStatusCommand = vscode.commands.registerCommand('lutex-ext.showStatus', async () => {
+    const showStatusCommand = vscode.commands.registerCommand('lutex.showStatus', async () => {
         const options: vscode.QuickPickItem[] = [];
         
         // Add options based on current state
@@ -683,13 +747,13 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Execute based on selection
         if (selection.label.includes('LuTeX Renderer with Listener')) {
-            await vscode.commands.executeCommand('lutex-ext.launchLutexWithListener');
+            await vscode.commands.executeCommand('lutex.launchLutexWithListener');
         } else if (selection.label.includes('Markdown Renderer with Listener')) {
-            await vscode.commands.executeCommand('lutex-ext.launchMarkdownWithListener');
+            await vscode.commands.executeCommand('lutex.launchMarkdownWithListener');
         } else if (selection.label.includes('Slides Renderer with Listener')) {
-            await vscode.commands.executeCommand('lutex-ext.launchSlidesWithListener');
+            await vscode.commands.executeCommand('lutex.launchSlidesWithListener');
         } else if (selection.label.includes('Listener Only')) {
-            await vscode.commands.executeCommand('lutex-ext.launchListener');
+            await vscode.commands.executeCommand('lutex.launchListener');
         } else if (selection.label.includes('Stop LuTeX Renderer')) {
             if (texRendererServer.isRunning()) {
                 texRendererServer.stop();
@@ -718,7 +782,7 @@ export function activate(context: vscode.ExtensionContext) {
                 outputChannel.appendLine('[LuTeX] Listener stopped');
             }
         } else if (selection.label.includes('Close All')) {
-            await vscode.commands.executeCommand('lutex-ext.closeAll');
+            await vscode.commands.executeCommand('lutex.closeAll');
         }
     });
 
@@ -728,6 +792,7 @@ export function activate(context: vscode.ExtensionContext) {
         launchMarkdownWithListenerCommand,
         launchSlidesWithListenerCommand,
         launchListenerCommand,
+        toggleSidecarVisibilityCommand,
         closeAllCommand,
         jumpToHtmlCommand,
         exportSlidesToPdfCommand,
@@ -745,11 +810,11 @@ export function activate(context: vscode.ExtensionContext) {
         setTimeout(async () => {
             try {
                 if (autoLaunch === 'slides') {
-                    await vscode.commands.executeCommand('lutex-ext.launchSlidesWithListener');
+                    await vscode.commands.executeCommand('lutex.launchSlidesWithListener');
                 } else if (autoLaunch === 'tex') {
-                    await vscode.commands.executeCommand('lutex-ext.launchLutexWithListener');
+                    await vscode.commands.executeCommand('lutex.launchLutexWithListener');
                 } else if (autoLaunch === 'listener') {
-                    await vscode.commands.executeCommand('lutex-ext.launchListener');
+                    await vscode.commands.executeCommand('lutex.launchListener');
                 }
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);

@@ -42,7 +42,7 @@ const transformPatterns: TransformPattern[] = [
 
 export function registerFileCommands(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel): void {
     // Register the 'Inline to display' command
-    const inlineToDisplayCommand = vscode.commands.registerCommand('lutex-ext.inlineToDisplay', () => {
+    const inlineToDisplayCommand = vscode.commands.registerCommand('lutex.inlineToDisplay', () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             outputChannel.appendLine('[Inline to Display] No active editor found');

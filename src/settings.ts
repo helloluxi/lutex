@@ -1,44 +1,44 @@
 import * as vscode from 'vscode';
 
 export function getRendererPortFromSettings(): number {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     return config.get<number>('rendererPort') ?? 0;
 }
 
 export function getListenerPortFromSettings(): number {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     return config.get<number>('listenerPort') ?? 0;
 }
 
 export function getThemeFromSettings(): string {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     return config.get<string>('theme') ?? 'dark';
 }
 
 export function getKatexMacrosFromSettings(): { [key: string]: string } {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     const macros = config.get<{ [key: string]: string }>('katexMacros');
     return macros || {};
 }
 
 export function getChromePathFromSettings(): string | undefined {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     const chromePath = config.get<string>('chromePath');
     return chromePath && chromePath.trim() !== '' ? chromePath.trim() : undefined;
 }
 
 export function getAutoLaunchFromSettings(): string {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     return config.get<string>('autoLaunch') ?? 'none';
 }
 
 export function getPdfExportDateFromSettings(): string {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     return config.get<string>('pdfExportDate') ?? '';
 }
 
 export function getAllowLANFromSettings(): boolean {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     return config.get<boolean>('allowLAN') ?? false;
 }
 
@@ -48,7 +48,7 @@ export function getServerHostname(): string {
 
 // Backward compatibility
 export function getPortFromSettings(): number | undefined {
-    const config = vscode.workspace.getConfiguration('lutex-ext');
+    const config = vscode.workspace.getConfiguration('lutex');
     const oldPort = config.get<number>('port');
     if (oldPort && oldPort !== 1024) {
         return oldPort;
