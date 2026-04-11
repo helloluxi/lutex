@@ -69,13 +69,21 @@
       },
       {
         "command": "lutex.sidecar.toggleVisibility",
-        "title": "Sidecar: Toggle Visibility"
+        "title": "LuTeX: Toggle Sidecar Visibility"
+      },
+      {
+        "command": "lutex.sidecar.open",
+        "title": "LuTeX: Open Sidecar Markdown"
       }
     ],
     "keybindings": [
       {
         "command": "lutex.sidecar.toggleVisibility",
         "key": "ctrl+shift+alt+d"
+      },
+      {
+        "command": "lutex.sidecar.open",
+        "key": "ctrl+shift+alt+e"
       }
     ],
     "configuration": {

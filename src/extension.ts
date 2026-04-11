@@ -387,6 +387,25 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    const openSidecarMarkdownCommand = vscode.commands.registerCommand('lutex.sidecar.open', async (resource?: vscode.Uri) => {
+        const sourceUri = resource ?? vscode.window.activeTextEditor?.document.uri;
+
+        if (!sourceUri || sourceUri.scheme !== 'file') {
+            vscode.window.showErrorMessage('Select a file or open one in the editor before opening sidecar markdown.');
+            return;
+        }
+
+        const sidecarUri = vscode.Uri.file(`${sourceUri.fsPath}.md`);
+
+        try {
+            await vscode.workspace.fs.stat(sidecarUri);
+            const document = await vscode.workspace.openTextDocument(sidecarUri);
+            await vscode.window.showTextDocument(document, { preview: false });
+        } catch {
+            vscode.window.showErrorMessage(`Sidecar markdown not found: ${sidecarUri.fsPath}`);
+        }
+    });
+
     // Close All
     const closeAllCommand = vscode.commands.registerCommand('lutex.closeAll', () => {
         let stopped: string[] = [];
@@ -777,6 +796,7 @@ export function activate(context: vscode.ExtensionContext) {
         launchSlidesWithListenerCommand,
         launchListenerCommand,
         toggleSidecarVisibilityCommand,
+        openSidecarMarkdownCommand,
         closeAllCommand,
         jumpToHtmlCommand,
         exportSlidesToPdfCommand,
