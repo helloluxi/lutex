@@ -5,14 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markdown Viewer</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <link rel="stylesheet" id="prism-theme-dark" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
-    <link rel="stylesheet" id="prism-theme-light" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" disabled>
+    <link rel="stylesheet" href="/katex/katex.min.css">
+    <link rel="stylesheet" id="prism-theme-dark" href="/prism/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" id="prism-theme-light" href="/prism/themes/prism.min.css" disabled>
     <link rel="stylesheet" href="md.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="/katex/katex.min.js"></script>
+    <script src="/katex/contrib/auto-render.min.js"></script>
+    <script src="/prism/prism.js"></script>
+    <script src="/prism/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script>if (window.Prism) Prism.plugins.autoloader.languages_path = '/prism/components/';</script>
     <script>
         window.katexReady = Promise.resolve();
     </script>

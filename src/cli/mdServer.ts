@@ -22,12 +22,16 @@ export class MdServerCli {
     private filePath: string;
     private resourcesPath: string;
     private distResourcesPath: string;
+    private katexPath: string;
+    private prismPath: string;
     private sseClients: Set<http.ServerResponse> = new Set();
 
     constructor(filePath: string) {
         this.filePath = path.resolve(filePath);
         this.resourcesPath = path.join(__dirname, '../../res/md');
         this.distResourcesPath = path.join(__dirname, '../../res/dist');
+        this.katexPath = path.join(__dirname, '../../node_modules/katex/dist');
+        this.prismPath = path.join(__dirname, '../../node_modules/prismjs');
         this.server = this.createServer();
     }
 
@@ -77,6 +81,12 @@ export class MdServerCli {
         } else if (pathname.startsWith('/dist/')) {
             filePath = path.join(this.distResourcesPath, pathname.substring(6));
             contentType = 'application/javascript';
+        } else if (pathname.startsWith('/katex/')) {
+            filePath = path.join(this.katexPath, pathname.substring(7));
+            contentType = this.getContentType(pathname);
+        } else if (pathname.startsWith('/prism/')) {
+            filePath = path.join(this.prismPath, pathname.substring(7));
+            contentType = this.getContentType(pathname);
         } else if (pathname.endsWith('.css')) {
             filePath = path.join(this.resourcesPath, path.basename(pathname));
             contentType = 'text/css';
@@ -103,12 +113,17 @@ export class MdServerCli {
         const ext = path.extname(filePath).toLowerCase();
         const map: { [key: string]: string } = {
             '.md': 'text/markdown',
+            '.js': 'application/javascript',
+            '.css': 'text/css',
             '.png': 'image/png',
             '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
             '.gif': 'image/gif',
             '.svg': 'image/svg+xml',
             '.bmp': 'image/bmp',
             '.webp': 'image/webp',
+            '.woff2': 'font/woff2',
+            '.woff': 'font/woff',
+            '.ttf': 'font/ttf',
         };
         return map[ext] ?? 'application/octet-stream';
     }

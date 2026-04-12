@@ -105,7 +105,10 @@
         },
         "lutex.theme": {
           "type": "string",
-          "enum": ["light", "dark"],
+          "enum": [
+            "light",
+            "dark"
+          ],
           "default": "dark",
           "description": "Default theme for the LuTeX renderer"
         },
@@ -130,7 +133,12 @@
         },
         "lutex.autoLaunch": {
           "type": "string",
-          "enum": ["none", "slides", "tex", "listener"],
+          "enum": [
+            "none",
+            "slides",
+            "tex",
+            "listener"
+          ],
           "default": "none",
           "description": "Automatically launch renderer on startup. 'slides' and 'tex' will also launch the listener.",
           "enumDescriptions": [
@@ -211,6 +219,8 @@
     "@typescript-eslint/parser": "^5.30.5",
     "@vscode/vsce": "^2.15.0",
     "eslint": "^8.13.0",
+    "katex": "^0.16.45",
+    "prismjs": "^1.30.0",
     "typescript": "^5.9.2"
   },
   "optionalDependencies": {
