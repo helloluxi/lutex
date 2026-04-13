@@ -11,17 +11,6 @@ import { StatusBarManager } from './statusBar';
 import { checkMainTexExists } from './tools';
 import { generateSlidePDF } from './slidesToPdf';
 
-type SidecarExcludeValue = boolean | Record<string, unknown>;
-function getConfiguredSidecarExcludeRules(): string[] {
-    const config = vscode.workspace.getConfiguration('lutex.sidecar');
-    return config.get<string[]>('excludeRules') ?? [];
-}
-
-function getWorkspaceFilesExclude(): Record<string, SidecarExcludeValue> {
-    const filesConfig = vscode.workspace.getConfiguration('files');
-    return filesConfig.get<Record<string, SidecarExcludeValue>>('exclude') ?? {};
-}
-
 export function activate(context: vscode.ExtensionContext) {
     // Create a dedicated output channel for LuTeX
     const outputChannel = vscode.window.createOutputChannel('LuTeX');
@@ -347,62 +336,6 @@ export function activate(context: vscode.ExtensionContext) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to start listener: ${errorMessage}`);
             outputChannel.appendLine(`[LuTeX] Launch listener error: ${errorMessage}`);
-        }
-    });
-
-    const toggleSidecarVisibilityCommand = vscode.commands.registerCommand('lutex.sidecar.toggleVisibility', async () => {
-        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
-            vscode.window.showErrorMessage('Open a workspace folder before toggling sidecar visibility.');
-            return;
-        }
-
-        const managedPatterns = getConfiguredSidecarExcludeRules();
-
-        if (managedPatterns.length === 0) {
-            vscode.window.showInformationMessage('No sidecar rules configured in lutex.sidecar.excludeRules.');
-            return;
-        }
-
-        const enabled = context.workspaceState.get<boolean>('lutex.sidecar.enabled', false);
-        const nextFilesExclude = { ...getWorkspaceFilesExclude() };
-
-        if (enabled) {
-            for (const pattern of managedPatterns) {
-                delete nextFilesExclude[pattern];
-            }
-        } else {
-            for (const pattern of managedPatterns) {
-                nextFilesExclude[pattern] = true;
-            }
-        }
-
-        try {
-            await vscode.workspace.getConfiguration('files').update('exclude', nextFilesExclude, vscode.ConfigurationTarget.Workspace);
-            await context.workspaceState.update('lutex.sidecar.enabled', !enabled);
-            vscode.window.showInformationMessage(enabled ? 'Sidecar visibility enabled.' : 'Sidecar visibility hidden.');
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to toggle sidecar visibility: ${errorMessage}`);
-            outputChannel.appendLine(`[LuTeX] Toggle sidecar visibility error: ${errorMessage}`);
-        }
-    });
-
-    const openSidecarMarkdownCommand = vscode.commands.registerCommand('lutex.sidecar.open', async (resource?: vscode.Uri) => {
-        const sourceUri = resource ?? vscode.window.activeTextEditor?.document.uri;
-
-        if (!sourceUri || sourceUri.scheme !== 'file') {
-            vscode.window.showErrorMessage('Select a file or open one in the editor before opening sidecar markdown.');
-            return;
-        }
-
-        const sidecarUri = vscode.Uri.file(`${sourceUri.fsPath}.md`);
-
-        try {
-            await vscode.workspace.fs.stat(sidecarUri);
-            const document = await vscode.workspace.openTextDocument(sidecarUri);
-            await vscode.window.showTextDocument(document, { preview: false });
-        } catch {
-            vscode.window.showErrorMessage(`Sidecar markdown not found: ${sidecarUri.fsPath}`);
         }
     });
 
@@ -795,8 +728,6 @@ export function activate(context: vscode.ExtensionContext) {
         launchMarkdownWithListenerCommand,
         launchSlidesWithListenerCommand,
         launchListenerCommand,
-        toggleSidecarVisibilityCommand,
-        openSidecarMarkdownCommand,
         closeAllCommand,
         jumpToHtmlCommand,
         exportSlidesToPdfCommand,

@@ -1,12 +1,16 @@
 # LuTeX VSCode Extension
 
-Real-time interactive LaTeX and Markdown renderers in HTML.
+**Real-time** interactive LaTeX and Markdown renderers in HTML.
 
-It also includes a workspace-scoped sidecar visibility toggle that manages configured `files.exclude` rules.
+## Live Demos
+
+- LaTeX Renderer: TBD...
+- Markdown Slides Renderer: [https://helloluxi.github.io/html-slides](https://helloluxi.github.io/html-slides)
+- Markdown Notes Renderer: [https://xlu.casa/n](https://xlu.casa/n)
 
 ## Getting Started
 
-1. Run `run.ps1` to build and install the extension
+1. Run `run.sh` to build and install the extension
 2. Open a workspace with `main.tex` (for LaTeX) or `main.md` (for Markdown)
 3. Open command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
 4. Run:
@@ -45,7 +49,6 @@ To uninstall: `rm ~/.local/bin/md`
 | **Launch Listener Only** | Start background service without opening preview |
 | **Close All** | Stop all running services |
 | **Jump to HTML Element** | Scroll preview to match current editor line |
-| **Sidecar: Toggle Visibility** | Toggle configured workspace `files.exclude` rules on and off |
 
 ## Keyboard Shortcuts
 
@@ -55,26 +58,6 @@ To uninstall: `rm ~/.local/bin/md`
 
 **In VS Code:**
 - Run `Jump to HTML Element` command to scroll preview to current line, you may bind custom key
-- `Ctrl+Shift+Alt+D` toggles configured sidecar visibility rules by default
-
-## Sidecar Toggle Configuration
-
-Configure the managed patterns in your workspace settings:
-
-```json
-"lutex.sidecar.excludeRules": [
-  "**/*.py.md",
-  "**/*.cs.md",
-  "**/*.cpp.md",
-  "**/*.cu.md",
-  "**/*.c.md",
-  "**/*.h.md",
-  "**/*.js.md",
-  "**/*.ts.md"
-]
-```
-
-Running `Sidecar: Toggle Visibility` merges these patterns into workspace `files.exclude`. Running it again removes only those managed patterns and leaves unrelated `files.exclude` entries untouched.
 
 ## How It Works
 

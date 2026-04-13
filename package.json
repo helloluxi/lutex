@@ -66,26 +66,9 @@
         "title": "Export Slides to PDF",
         "category": "LuTeX",
         "enablement": "lutexSlidesRendererActive"
-      },
-      {
-        "command": "lutex.sidecar.toggleVisibility",
-        "title": "LuTeX: Toggle Sidecar Visibility"
-      },
-      {
-        "command": "lutex.sidecar.open",
-        "title": "LuTeX: Open Sidecar Markdown"
       }
     ],
-    "keybindings": [
-      {
-        "command": "lutex.sidecar.toggleVisibility",
-        "key": "ctrl+shift+alt+d"
-      },
-      {
-        "command": "lutex.sidecar.open",
-        "key": "ctrl+shift+alt+e"
-      }
-    ],
+    "keybindings": [],
     "configuration": {
       "title": "LuTeX",
       "properties": {
@@ -152,40 +135,6 @@
           "type": "boolean",
           "default": false,
           "description": "Allow access from LAN by binding servers to 0.0.0.0 instead of localhost"
-        },
-        "lutex.sidecar.excludeRules": {
-          "type": "array",
-          "default": [
-            "**/*.py.md",
-            "**/*.cs.md",
-            "**/*.cpp.md",
-            "**/*.cc.md",
-            "**/*.cxx.md",
-            "**/*.cu.md",
-            "**/*.cuh.md",
-            "**/*.c.md",
-            "**/*.h.md",
-            "**/*.hpp.md",
-            "**/*.hh.md",
-            "**/*.hxx.md",
-            "**/*.js.md",
-            "**/*.jsx.md",
-            "**/*.ts.md",
-            "**/*.tsx.md",
-            "**/*.java.md",
-            "**/*.rs.md",
-            "**/*.go.md",
-            "**/*.php.md",
-            "**/*.rb.md",
-            "**/*.swift.md",
-            "**/*.kt.md",
-            "**/*.m.md",
-            "**/*.mm.md"
-          ],
-          "description": "Workspace file exclusion rules toggled by the Sidecar: Toggle Visibility command.",
-          "items": {
-            "type": "string"
-          }
         }
       }
     }
