@@ -68,7 +68,13 @@
         "enablement": "lutexSlidesRendererActive"
       }
     ],
-    "keybindings": [],
+    "keybindings": [
+      {
+        "command": "lutex.launchMarkdownWithListener",
+        "key": "ctrl+shift+alt+m",
+        "mac": "cmd+shift+alt+m"
+      }
+    ],
     "configuration": {
       "title": "LuTeX",
       "properties": {
