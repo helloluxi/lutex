@@ -8,4 +8,6 @@ ai/
 
 *.vsix
 .DS_Store
-CLAUDE.md
+
+*.md
+!README.md
