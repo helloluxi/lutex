@@ -76,7 +76,7 @@
                 if (!anchor) return;
 
                 const href = anchor.getAttribute('href');
-                if (!href || href.startsWith('http://') || href.startsWith('https://')) return;
+                if (!href || href.startsWith('#') || href.startsWith('http://') || href.startsWith('https://')) return;
 
                 e.preventDefault();
 
