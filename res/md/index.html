@@ -81,9 +81,19 @@
                 e.preventDefault();
 
                 if (href.endsWith('.md')) {
-                    // Navigate to same md server with updated file param
+                    // Resolve href relative to current file's directory so it stays workspace-relative
+                    const currentFile = window.lutexMarkdownFile || 'main.md';
+                    const lastSlash = currentFile.lastIndexOf('/');
+                    const currentDir = lastSlash >= 0 ? currentFile.substring(0, lastSlash + 1) : '';
+                    const parts = (currentDir + href).split('/');
+                    const normalized = [];
+                    for (const part of parts) {
+                        if (part === '..') normalized.pop();
+                        else if (part !== '.') normalized.push(part);
+                    }
+                    const resolvedFile = normalized.join('/');
                     const url = new URL(window.location.href);
-                    url.searchParams.set('f', href);
+                    url.searchParams.set('f', resolvedFile);
                     window.location.href = url.toString();
                 } else {
                     // Send jump-to-line-1 request to listener port for other file links
@@ -208,12 +218,11 @@
             }
         });
 
-        // Set up auto-refresh listener if running on localhost with listener port
-        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        // Set up auto-refresh listener when listener port is configured
         const listenerPort = window.lutexListenerPort;
 
-        if (isLocalHost && listenerPort) {
-            const eventSource = new EventSource(`http://localhost:${listenerPort}/event`);
+        if (listenerPort) {
+            const eventSource = new EventSource(`http://${window.location.hostname}:${listenerPort}/event`);
             eventSource.addEventListener('message', (event) => {
                 try {
                     const data = JSON.parse(event.data);
