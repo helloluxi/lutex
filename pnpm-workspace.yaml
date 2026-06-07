@@ -1,0 +1,4 @@
+# puppeteer is an optional Phase-2 dep; its install build script (Chromium download) is
+# intentionally skipped. `false` records that decision so pnpm doesn't error on it.
+allowBuilds:
+  puppeteer: false

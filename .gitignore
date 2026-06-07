@@ -1,0 +1,13 @@
+.vscode/
+.memory/
+.windsurf/
+node_modules/
+dist/
+out/
+ai/
+
+*.vsix
+.DS_Store
+
+*.md
+!README.md

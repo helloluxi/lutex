@@ -1,0 +1,34 @@
+{
+  "name": "lutex",
+  "description": "Live LaTeX / Markdown / Slides rendering with two-way Neovim navigation, plus a stable HTTP file-jump listener",
+  "version": "0.1.0",
+  "bin": {
+    "lutex": "./out/cli.js",
+    "md": "./out/cli/md.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/helloluxi/lutex"
+  },
+  "scripts": {
+    "compile": "tsc -p ./tsconfig.json && tsc -p ./tsconfig.res.json",
+    "compile:listener": "tsc -p ./tsconfig.json",
+    "compile:res": "tsc -p ./tsconfig.res.json",
+    "compile:cli": "tsc -p ./tsconfig.cli.json",
+    "watch": "tsc -watch -p ./tsconfig.json",
+    "clean": "rimraf out res/dist"
+  },
+  "dependencies": {
+    "neovim": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "katex": "^0.16.45",
+    "prismjs": "^1.30.0",
+    "typescript": "^5.9.2"
+  },
+  "optionalDependencies": {
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.11.2"
+  }
+}

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Viewer</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71HotJqlAn" crossorigin="anonymous">
+    <link rel="stylesheet" id="prism-theme-dark" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" id="prism-theme-light" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" disabled>
+    <link rel="stylesheet" href="md.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" integrity="sha384-cpW21h6RZv/phavutF+AuVYrr+dA8xD9zs6FwLpaCct6O9ctzYFfFr4dgmgccOTx" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script>if (window.Prism) Prism.plugins.autoloader.languages_path = 'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/';</script>
+    <script>
+        window.katexReady = Promise.resolve();
+    </script>
+</head>
+<body>
+    <div id="mainContainer"></div>
+
+    <script type="module">
+        import ThemeManager from '/dist/Theme.js';
+        import { renderMarkdownWithMath } from '/dist/mdRenderer.js';
+
+        const themeManager = new ThemeManager();
+
+        // Helper function to update URL parameter
+        function updateUrlThemeParam(theme) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('m', theme);
+            window.history.replaceState({}, '', url);
+        }
+
+        // Initialize theme from URL param only
+        const urlParams = new URLSearchParams(window.location.search);
+        const themeFromUrl = urlParams.get('m') || 'dark'; // Default to dark if not specified
+        themeManager.setTheme(themeFromUrl);
+        syncPrismTheme(themeFromUrl);
+        if (window.lutexDefaultTheme) {
+            delete window.lutexDefaultTheme;
+        }
+
+        // Get KaTeX macros from configuration or use defaults
+        const katexMacros = window.lutexKatexMacros || {
+            "\\ket": "\\lvert #1 \\rangle",
+            "\\bra": "\\langle #1 \\rvert",
+            "\\ip": "\\langle #1 | #2 \\rangle",
+            "\\dyad": "\\ket{#1} \\bra{#2}"
+        };
+
+        async function loadMarkdown() {
+            const markdownFile = window.lutexMarkdownFile || 'main.md';
+            try {
+                const response = await fetch(markdownFile.startsWith('/') ? markdownFile : `./${markdownFile}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load ${markdownFile}: ${response.status} ${response.statusText}`);
+                }
+                return await response.text();
+            } catch (error) {
+                throw new Error(`Network error loading ${markdownFile}: ${error.message}`);
+            }
+        }
+
+        // Setup click handler for file links when listener port is active
+        function setupLinkClickHandler() {
+            const listenerPort = window.lutexListenerPort;
+            if (!listenerPort || listenerPort === 0) return;
+
+            const listenerHost = window.location.hostname;
+
+            document.addEventListener('click', (e) => {
+                const anchor = e.target.closest('a');
+                if (!anchor) return;
+
+                const href = anchor.getAttribute('href');
+                if (!href || href.startsWith('#') || href.startsWith('http://') || href.startsWith('https://')) return;
+
+                e.preventDefault();
+
+                if (href.endsWith('.md')) {
+                    // Resolve href relative to current file's directory so it stays workspace-relative
+                    const currentFile = window.lutexMarkdownFile || 'main.md';
+                    const lastSlash = currentFile.lastIndexOf('/');
+                    const currentDir = lastSlash >= 0 ? currentFile.substring(0, lastSlash + 1) : '';
+                    const parts = (currentDir + href).split('/');
+                    const normalized = [];
+                    for (const part of parts) {
+                        if (part === '..') normalized.pop();
+                        else if (part !== '.') normalized.push(part);
+                    }
+                    const resolvedFile = normalized.join('/');
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('f', resolvedFile);
+                    window.location.href = url.toString();
+                } else {
+                    // Send jump-to-line-1 request to listener port for other file links
+                    fetch(`http://${listenerHost}:${listenerPort}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file: href, line: 1, action: 'jump' })
+                    }).catch(error => console.error('[LuTeX] Error sending jump request:', error));
+                }
+            });
+        }
+
+        async function init() {
+            const contentElement = document.getElementById('mainContainer');
+            try {
+                const markdownFile = window.lutexMarkdownFile || 'main.md';
+                const markdown = await loadMarkdown();
+                await renderMarkdownWithMath(markdown, contentElement, katexMacros, markdownFile);
+
+                // Restore scroll to saved h2/h3 section after render
+                const savedHeading = localStorage.getItem('mdScrollHeading');
+                if (savedHeading !== null) {
+                    localStorage.removeItem('mdScrollHeading');
+                    for (const h of document.querySelectorAll('h2, h3')) {
+                        if (h.textContent.trim() === savedHeading) {
+                            h.scrollIntoView({ behavior: 'instant', block: 'start' });
+                            break;
+                        }
+                    }
+                }
+
+                // Setup double-click handler for jump-to-source
+                setupDoubleClickHandler();
+                // Setup click handler for file links
+                setupLinkClickHandler();
+            } catch (error) {
+                console.error('Error loading content:', error);
+                contentElement.innerHTML = `
+                    <div style="max-width: 800px; margin: 100px auto; padding: 40px; background: var(--bg-secondary, #f8f9fa); border-radius: 12px; border-left: 4px solid #e74c3c;">
+                        <h2 style="color: #e74c3c; margin-top: 0;">Error Loading Content</h2>
+                        <p style="font-size: 1.1em; margin: 20px 0;"><strong>Error:</strong> ${error.message}</p>
+                        <p style="color: var(--text-secondary, #666);">Please make sure the markdown file exists in your workspace.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Setup double-click handler for jumping to source
+        function setupDoubleClickHandler() {
+            const listenerPort = window.lutexListenerPort;
+            
+            if (listenerPort && listenerPort !== 0) {
+                console.log('[LuTeX] Listener integration enabled:', { listenerPort, hostname: window.location.hostname });
+                const listenerHost = window.location.hostname;
+                
+                // Function to send jump request
+                const sendJumpRequest = (element, action = 'jump') => {
+                    const file = window.lutexMarkdownFile;
+                    const line = element.getAttribute('line');
+                    console.log('[LuTeX] Double-click detected:', { file, line, action, element });
+                    if (!file || !line) {
+                        console.warn('[LuTeX] Missing file or line attribute');
+                        return;
+                    }
+                    const url = `http://${listenerHost}:${listenerPort}`;
+                    const payload = { file, line, action };
+                    console.log('[LuTeX] Sending request to:', url, 'with payload:', payload);
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(response => {
+                        console.log('[LuTeX] Request successful:', response.status);
+                    })
+                    .catch(error => {
+                        console.error('[LuTeX] Error sending request:', error);
+                    });
+                };
+                
+                // Add double-click handler for desktop
+                document.addEventListener('dblclick', (e) => {
+                    let element = e.target;
+                    while (element && !element.hasAttribute('line')) {
+                        element = element.parentElement;
+                    }
+                    if (element) {
+                        sendJumpRequest(element);
+                    }
+                });
+
+                // Add click handler for checkboxes
+                document.addEventListener('click', (e) => {
+                    if (e.target.type !== 'checkbox') return;
+                    let element = e.target.parentElement;
+                    while (element && !element.hasAttribute('line')) {
+                        element = element.parentElement;
+                    }
+                    if (element) {
+                        sendJumpRequest(element, 'check');
+                    }
+                });
+            } else {
+                console.log('[LuTeX] Listener integration disabled:', { listenerPort, lutexListenerPort: window.lutexListenerPort });
+            }
+        }
+
+        function syncPrismTheme(theme) {
+            document.getElementById('prism-theme-dark').disabled = (theme === 'light');
+            document.getElementById('prism-theme-light').disabled = (theme !== 'light');
+        }
+
+        // Add keyboard listener for 'M' key to toggle theme
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'm' || event.key === 'M') {
+                themeManager.toggle();
+                const newTheme = themeManager.getCurrentTheme();
+                updateUrlThemeParam(newTheme);
+                syncPrismTheme(newTheme);
+            }
+        });
+
+        // Set up auto-refresh listener when listener port is configured
+        const listenerPort = window.lutexListenerPort;
+
+        if (listenerPort) {
+            const eventSource = new EventSource(`http://${window.location.hostname}:${listenerPort}/event`);
+            eventSource.addEventListener('message', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'refresh') {
+                        const thisFile = window.lutexMarkdownFile || 'main.md';
+                        if (data.file && data.file !== thisFile) return;
+                        // Save current h2/h3 section before reloading
+                        const headings = [...document.querySelectorAll('h2, h3')];
+                        const active = headings.findLast(h => h.getBoundingClientRect().top <= 1);
+                        if (active) {
+                            localStorage.setItem('mdScrollHeading', active.textContent.trim());
+                        } else {
+                            localStorage.removeItem('mdScrollHeading');
+                        }
+                        location.reload();
+                    } else if (data.type === 'close') {
+                        // Server is shutting down, close the window/tab
+                        window.close();
+                    } else if (data.type === 'scroll') {
+                        // Handle scroll requests
+                        console.log('Scroll event received:', data);
+                    }
+                } catch (error) {
+                    console.error('Error processing event:', error);
+                }
+            });
+        }
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slides Viewer</title>
+  <link rel="icon" href="data:,">
+  
+  <!-- KaTeX CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71HotJqlAn" crossorigin="anonymous">
+  
+  <!-- KaTeX JavaScript -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" integrity="sha384-cpW21h6RZv/phavutF+AuVYrr+dA8xD9zs6FwLpaCct6O9ctzYFfFr4dgmgccOTx" crossorigin="anonymous"></script>
+  
+  <!-- KaTeX auto-render extension -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+  
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+  
+  <!-- Prism.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+  <link rel="stylesheet" href="sd.css">
+  <script>
+    // Placeholder for server-injected configuration
+  </script>
+  <!-- Load KaTeX macros from file (for static file server) -->
+  <script src="./dist/katexMacros.js" onerror="console.log('No katexMacros.js found, using defaults or server-injected config')"></script>
+</head>
+
+<body>
+  <div class="slides-container" id="slides-container">
+    <!-- Content will be loaded here -->
+  </div>
+  <div class="progress-container">
+    <div class="progress-bar"></div>
+    <div class="slide-number">
+      <span class="nav-arrow" onclick="prevSlide()">&lt;</span>
+      <span id="slide-number-text">NaN</span>
+      <span class="nav-arrow" onclick="nextSlide()">&gt;</span>
+    </div>
+  </div>
+
+  <script type="module">
+  // Support both server-hosted and static-hosted usage by using a relative import
+  import MarkdownSlidesParser from './dist/sdRenderer.js';
+    window.MarkdownSlidesParser = MarkdownSlidesParser;    class SlidesApp {
+      constructor() {
+        this.slideIdx = 0;
+        this.slides = [];
+        this.slideNumber = null;
+        this.progressBar = null;
+        this.isZoomed = false;
+        this.ZOOM_FACTOR = 2;
+        this.parser = new MarkdownSlidesParser();
+        // Get KaTeX macros from configuration or use defaults
+        this.katexMacros = window.lutexKatexMacros || {
+            "\\ket": "\\lvert #1 \\rangle",
+            "\\bra": "\\langle #1 \\rvert",
+            "\\ip": "\\langle #1 | #2 \\rangle",
+            "\\dyad": "\\ket{#1} \\bra{#2}"
+        };
+        this.isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+
+        this.init();
+      }
+
+      async init() {
+        this.slideNumber = document.querySelector('#slide-number-text');
+        this.progressBar = document.querySelector('.progress-bar');
+
+        this.setupEventListeners();
+        this.loadContent();
+      }
+
+      setupKatexRendering() {
+        // Configure KaTeX auto-render with loaded macros
+        const katexOptions = {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          macros: this.katexMacros,
+          throwOnError: false,
+          errorColor: '#cc0000',
+          strict: false
+        };
+
+        // Render math in the slides container
+        renderMathInElement(document.getElementById('slides-container'), katexOptions);
+      }
+
+      setupEventListeners() {
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+            this.nextSlide();
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+            this.prevSlide();
+          }
+        });
+
+        // Zoom functionality
+        document.addEventListener('keydown', (e) => this.handleZoom(e));
+        document.addEventListener('keyup', (e) => this.resetZoom(e));
+        document.addEventListener('mousemove', (e) => this.updateZoomPosition(e));
+
+        // Wheel navigation
+        this.setupWheelNavigation();
+
+        // Touch navigation
+        this.setupTouchNavigation();
+
+        // Navigation buttons
+        window.nextSlide = () => this.nextSlide();
+        window.prevSlide = () => this.prevSlide();
+      }
+
+      setupWheelNavigation() {
+        let scrollStartTime = null;
+        let lastScrollTime = 0;
+        let scrollDirection = 0; // 1 for down, -1 for up
+        let scrollTimeout;
+        const SCROLL_COOLDOWN = 150; // ms between slide changes
+
+        document.addEventListener('wheel', (e) => {
+          if (e.ctrlKey) return;
+          e.preventDefault();
+
+          const currentTime = Date.now();
+          const currentDirection = e.deltaY > 0 ? 1 : -1;
+
+          // Detect if this is a new scroll gesture or continuation
+          if (scrollStartTime === null || currentDirection !== scrollDirection || (currentTime - lastScrollTime) > 300) {
+            // New scroll gesture
+            scrollStartTime = currentTime;
+            scrollDirection = currentDirection;
+          }
+
+          lastScrollTime = currentTime;
+
+          // Calculate how long the user has been scrolling
+          const scrollDuration = currentTime - scrollStartTime;
+
+          // Clear any pending timeout
+          clearTimeout(scrollTimeout);
+
+          // Determine number of slides to move based on scroll duration
+          // First slide happens immediately, then every SCROLL_COOLDOWN ms
+          const slidesMoved = Math.floor(scrollDuration / SCROLL_COOLDOWN);
+          
+          // Only move if we haven't moved this many slides yet in this gesture
+          if (!this.lastSlidesMoved || slidesMoved > this.lastSlidesMoved) {
+            this.lastSlidesMoved = slidesMoved;
+            
+            if (scrollDirection > 0) {
+              this.nextSlide();
+            } else {
+              this.prevSlide();
+            }
+
+            // Add fade effect
+            if (this.slideIdx > 0 && this.slideIdx < this.slides.length - 1) {
+              this.slides[this.slideIdx].classList.add('fade-in');
+              setTimeout(() => {
+                this.slides[this.slideIdx].classList.remove('fade-in');
+              }, 1000);
+            }
+          }
+
+          // Reset after user stops scrolling
+          scrollTimeout = setTimeout(() => {
+            scrollStartTime = null;
+            this.lastSlidesMoved = 0;
+            scrollDirection = 0;
+          }, 300);
+        }, { passive: false });
+      }
+
+      setupTouchNavigation() {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        let initialTouchSlide = 0;
+        let initialTouchDistance = 0;
+        let hasChangedSlide = false;
+
+        document.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 2) {
+            touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            initialTouchDistance = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            initialTouchSlide = this.slideIdx;
+            hasChangedSlide = false;
+          }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+          if (e.touches.length === 2 && !hasChangedSlide) {
+            touchEndX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            touchEndY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            const currentTouchDistance = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+
+            if (Math.abs(currentTouchDistance - initialTouchDistance) < 50) {
+              e.preventDefault();
+              const deltaX = touchEndX - touchStartX;
+              const deltaY = touchEndY - touchStartY;
+              const screenWidth = window.innerWidth;
+              const totalSlides = this.slides.length - 1;
+              const SWIPE_THRESHOLD = screenWidth * 0.2; // 20% of screen width
+
+              if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+                const direction = deltaX > 0 ? -1 : 1; // Swipe right = previous, left = next
+                const targetSlide = initialTouchSlide + direction;
+                
+                if (targetSlide >= 0 && targetSlide <= totalSlides) {
+                  this.slideIdx = targetSlide;
+                  this.updateSlide();
+                  hasChangedSlide = true;
+                }
+              }
+            }
+          }
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+          hasChangedSlide = false;
+        }, { passive: true });
+      }
+
+      handleZoom(e) {
+        if (e.key === '`' && !this.isZoomed) {
+          this.isZoomed = true;
+          const slidesContainer = document.getElementById('slides-container');
+          slidesContainer.classList.add('zoomed');
+          this.updateZoomPosition(e);
+        }
+      }
+
+      resetZoom(e) {
+        if (e.key === '`') {
+          this.isZoomed = false;
+          const slidesContainer = document.getElementById('slides-container');
+          slidesContainer.classList.remove('zoomed');
+
+          const currentOrigin = slidesContainer.style.transformOrigin;
+          const currentTransform = slidesContainer.style.transform;
+
+          const matrix = new DOMMatrix(currentTransform);
+          const currentX = matrix.m41;
+          const currentY = matrix.m42;
+
+          slidesContainer.style.transition = 'transform 0.3s ease';
+          slidesContainer.style.transform = `translate(${currentX}px, ${currentY}px) scale(1)`;
+
+          setTimeout(() => {
+            slidesContainer.style.transition = 'none';
+            slidesContainer.style.transform = 'none';
+            slidesContainer.style.transformOrigin = '0 0';
+          }, 300);
+        }
+      }
+
+      updateZoomPosition(e) {
+        if (!this.isZoomed) return;
+
+        const slidesContainer = document.getElementById('slides-container');
+        const rect = slidesContainer.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const originX = (mouseX / rect.width) * 100;
+        const originY = (mouseY / rect.height) * 100;
+
+        slidesContainer.style.transformOrigin = `${originX}% ${originY}%`;
+        slidesContainer.style.transform = `scale(${this.ZOOM_FACTOR})`;
+      }
+
+      updateSlide() {
+        this.slides.forEach(slide => slide.classList.remove('active'));
+        this.slides[this.slideIdx].classList.add('active');
+
+        const adjustedSlideNumber = this.slideIdx === 0 ? 0 : this.slideIdx;
+        this.slideNumber.textContent = `${adjustedSlideNumber} / ${this.slides.length - 1}`;
+        this.progressBar.style.width = `${(adjustedSlideNumber / (this.slides.length - 1)) * 100}%`;
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('p', this.slideIdx);
+        window.history.replaceState({}, '', url.toString());
+
+        this.updateNavigationButtons();
+        
+        // Re-render math on slide change
+        this.setupKatexRendering();
+      }
+
+      updateNavigationButtons() {
+        const prevArrow = document.querySelector('.nav-arrow:first-child');
+        const nextArrow = document.querySelector('.nav-arrow:last-child');
+
+        if (this.slideIdx === 0) {
+          prevArrow.classList.add('disabled');
+        } else {
+          prevArrow.classList.remove('disabled');
+        }
+
+        if (this.slideIdx === this.slides.length - 1) {
+          nextArrow.classList.add('disabled');
+        } else {
+          nextArrow.classList.remove('disabled');
+        }
+      }
+
+      nextSlide() {
+        if (this.slideIdx < this.slides.length - 1) {
+          this.slideIdx++;
+          this.updateSlide();
+        }
+      }
+
+      prevSlide() {
+        if (this.slideIdx > 0) {
+          this.slideIdx--;
+          this.updateSlide();
+        }
+      }
+
+      async loadContent() {
+        try {
+          // Allow URL params fallback when not injected by server
+          const urlParams = new URLSearchParams(window.location.search);
+          if (typeof window.lutexMarkdownFile === 'undefined') {
+            const f = urlParams.get('f');
+            if (f) { window.lutexMarkdownFile = f; }
+          }
+          if (typeof window.lutexListenerPort === 'undefined') {
+            const o = urlParams.get('o');
+            if (o) { window.lutexListenerPort = parseInt(o, 10); }
+          }
+
+          const markdownFile = window.lutexMarkdownFile || 'main.md';
+          const text = await fetch(markdownFile.startsWith('/') ? markdownFile : `./${markdownFile}`).then(res => res.text());
+
+          // Parse markdown into slides
+          this.parser.parseMarkdown(text);
+
+          // Render slides to container
+          const slidesContainer = document.getElementById('slides-container');
+          this.slides = Array.from(this.parser.renderToContainer(slidesContainer));
+
+          // Handle URL parameters for slide navigation
+          const navParams = new URLSearchParams(window.location.search);
+          const slideParam = navParams.get('p');
+          if (slideParam) {
+            const parsedSlide = parseInt(slideParam) || 0;
+            this.slideIdx = Math.max(0, Math.min(parsedSlide, this.slides.length - 1));
+          }
+
+          this.updateSlide();
+          this.updateCurrentDate();
+
+          // Initial KaTeX rendering
+          this.setupKatexRendering();
+        } catch (error) {
+          console.error('Error loading content:', error);
+        }
+      }
+
+      updateCurrentDate() {
+        const dateElement = document.getElementById('current-date');
+        if (dateElement) {
+          const lang = dateElement.getAttribute('data-lang') || 'en-US';
+          const currentDate = new Date();
+          const formattedDate = currentDate.toLocaleDateString(lang, {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          dateElement.textContent = `${formattedDate}`;
+        }
+      }
+
+      // Public API methods
+      goToSlide(index) {
+        if (index >= 0 && index < this.slides.length) {
+          this.slideIdx = index;
+          this.updateSlide();
+        }
+      }
+
+      getCurrentSlide() {
+        return this.slideIdx;
+      }
+
+      getTotalSlides() {
+        return this.slides.length;
+      }
+    }
+
+    // Wait for KaTeX to load before initializing the app
+    document.addEventListener('DOMContentLoaded', () => {
+      // Check if KaTeX and auto-render are loaded
+      const checkKatexLoaded = () => {
+        if (typeof katex !== 'undefined' && typeof renderMathInElement !== 'undefined') {
+          window.slidesApp = new SlidesApp();
+          
+          // Set up auto-refresh listener if listener port is provided
+          const listenerPort = window.lutexListenerPort;
+
+          if (listenerPort) {
+            const listenerHost = window.location.hostname;
+            const eventSource = new EventSource(`http://${listenerHost}:${listenerPort}/event`);
+            eventSource.addEventListener('message', (event) => {
+              try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'refresh') {
+                  // Save current slide before refresh
+                  const currentSlide = window.slidesApp.getCurrentSlide();
+                  localStorage.setItem('slidesCurrentSlide', currentSlide.toString());
+                  location.reload();
+                } else if (data.type === 'close') {
+                  // Server is shutting down, close the window/tab
+                  window.close();
+                } else if (data.type === 'scroll') {
+                  // Jump to the slide that best matches the requested source line
+                  const targetLine = parseInt(data.line, 10);
+                  const slides = Array.from(document.querySelectorAll('.slide'));
+                  if (slides.length > 0 && !Number.isNaN(targetLine)) {
+                    // Choose the last slide whose starting line is <= targetLine
+                    let targetIdx = 0;
+                    for (let i = 0; i < slides.length; i++) {
+                      const sLine = parseInt(slides[i].getAttribute('line') || '0', 10);
+                      if (sLine <= targetLine) {
+                        targetIdx = i;
+                      } else {
+                        break;
+                      }
+                    }
+                    window.slidesApp.goToSlide(targetIdx);
+                  }
+                }
+              } catch (error) {
+                console.error('Error processing event:', error);
+              }
+            });
+          }
+
+          // Restore slide position after page load
+          const savedSlide = localStorage.getItem('slidesCurrentSlide');
+          if (savedSlide !== null) {
+            window.slidesApp.goToSlide(parseInt(savedSlide, 10));
+            // Clear the saved position after restoring
+            localStorage.removeItem('slidesCurrentSlide');
+          }
+
+          // Add jump to source functionality (enabled when listener port is provided)
+          if (listenerPort) {
+            const listenerHost = window.location.hostname;
+            
+            const sendJumpRequest = async (lineNumber) => {
+              const markdownFile = window.lutexMarkdownFile || 'main.md';
+              try {
+                await fetch(`http://${listenerHost}:${listenerPort}/jump`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    file: markdownFile, 
+                    line: parseInt(lineNumber) 
+                  })
+                });
+              } catch (error) {
+                console.error('Jump error:', error);
+              }
+            };
+            
+            // Desktop: double-click handler
+            document.addEventListener('dblclick', async (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              
+              // Find the closest element with a line attribute
+              let element = event.target;
+              let lineNumber = null;
+              
+              while (element && element !== document.body) {
+                if (element.hasAttribute && element.hasAttribute('line')) {
+                  lineNumber = element.getAttribute('line');
+                  break;
+                }
+                element = element.parentElement;
+              }
+              
+              if (lineNumber) {
+                await sendJumpRequest(lineNumber);
+              }
+            });
+            
+            // Mobile/Tablet: double-tap handler
+            let lastTap = 0;
+            let lastTapElement = null;
+            document.addEventListener('touchend', async (event) => {
+              const currentTime = new Date().getTime();
+              const tapLength = currentTime - lastTap;
+              
+              let element = event.target;
+              let lineNumber = null;
+              
+              while (element && element !== document.body) {
+                if (element.hasAttribute && element.hasAttribute('line')) {
+                  lineNumber = element.getAttribute('line');
+                  break;
+                }
+                element = element.parentElement;
+              }
+              
+              if (element && lineNumber && tapLength < 500 && tapLength > 0 && element === lastTapElement) {
+                event.preventDefault();
+                await sendJumpRequest(lineNumber);
+                lastTap = 0;
+              } else {
+                lastTap = currentTime;
+                lastTapElement = element;
+              }
+            });
+          }
+        } else {
+          setTimeout(checkKatexLoaded, 100);
+        }
+      };
+      checkKatexLoaded();
+    });
+  </script>
+</body>
+
+</html>
