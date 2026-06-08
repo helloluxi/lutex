@@ -32,7 +32,7 @@ const log = (msg: string) => console.error(msg);
 
 function openBrowser(url: string): void {
     try {
-        execSync(`xdg-open "${url}"`, { stdio: 'ignore' });
+        execSync(`open "${url}"`, { stdio: 'ignore' });
     } catch {
         // browser open failed; the URL is printed for the user to open manually
     }

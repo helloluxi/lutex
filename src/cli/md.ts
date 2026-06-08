@@ -25,7 +25,7 @@ async function main() {
     console.log(url);
 
     try {
-        execSync(`xdg-open "${url}"`, { stdio: 'ignore' });
+        execSync(`open "${url}"`, { stdio: 'ignore' });
     } catch {
         // browser open failed, URL is printed above
     }
