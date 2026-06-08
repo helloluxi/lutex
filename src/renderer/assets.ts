@@ -136,7 +136,11 @@ export class AssetResponder {
                 this.addRoot(root);
             }
         } else if (file) {
-            this.addRoot(path.dirname(file));
+            const dir = path.dirname(file);
+            this.addRoot(dir);
+            if (kind === 'slides') {
+                this.dumpSlidesStatic(path.resolve(dir));
+            }
         }
 
         const indexPath = path.join(this.pkgRoot, 'res', RES_DIR[kind], 'index.html');
@@ -192,6 +196,30 @@ export class AssetResponder {
             }
         }
         return null;
+    }
+
+    /** Copy sdRenderer.js + sd.css into {workspace}/dist/ and write {workspace}/index.html. */
+    private dumpSlidesStatic(root: string): void {
+        const distDir = path.join(root, 'dist');
+        try {
+            fs.mkdirSync(distDir, { recursive: true });
+            fs.copyFileSync(
+                path.join(this.pkgRoot, 'res', 'dist', 'sdRenderer.js'),
+                path.join(distDir, 'sdRenderer.js'),
+            );
+            fs.copyFileSync(
+                path.join(this.pkgRoot, 'res', 'sd', 'sd.css'),
+                path.join(distDir, 'sd.css'),
+            );
+            const template = fs.readFileSync(path.join(this.pkgRoot, 'res', 'sd', 'index.html'), 'utf8');
+            fs.writeFileSync(
+                path.join(root, 'index.html'),
+                template.replace('href="sd.css"', 'href="./dist/sd.css"'),
+                'utf8',
+            );
+        } catch (err) {
+            this.deps.log(`[assets] could not dump slides static assets to ${root}: ${err}`);
+        }
     }
 }
 
