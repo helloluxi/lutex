@@ -2,32 +2,36 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 
-function findAvailablePort(): Promise<number> {
-    return new Promise((resolve, reject) => {
-        const startPort = 12023;
-        let attemptCount = 0;
-        const tryPort = (port: number) => {
-            if (attemptCount++ >= 100) { reject(new Error('No available port found')); return; }
-            const s = http.createServer();
-            s.listen(port, 'localhost', () => s.close(() => resolve(port)));
-            s.on('error', () => tryPort(port + 1));
-        };
-        tryPort(startPort);
-    });
-}
+/** Fixed port for the shared `md` daemon. One process serves every file. */
+export const MD_DAEMON_PORT = 9988;
 
+/** Daemon build version (from package.json) — a stale daemon is replaced when this changes. */
+export const MD_VERSION: string = (() => {
+    try {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')).version ?? '0';
+    } catch {
+        return '0';
+    }
+})();
+
+/**
+ * The shared `md` daemon: one long-lived process on a fixed port that renders any markdown file.
+ * The file is chosen per-request via `?f=<absolute path>` (not baked in), so a single browser tab —
+ * and a single process — can switch between files and survive tab closes. Each served file is
+ * watched on disk; a change pushes a `refresh` over the `/event` SSE so open tabs live-reload.
+ */
 export class MdServerCli {
     private server: http.Server;
     private port: number | null = null;
-    private filePath: string;
     private resourcesPath: string;
     private distResourcesPath: string;
     private katexPath: string;
     private prismPath: string;
     private sseClients: Set<http.ServerResponse> = new Set();
+    private watchers: Map<string, fs.FSWatcher> = new Map();
+    private debounce: Map<string, NodeJS.Timeout> = new Map();
 
-    constructor(filePath: string) {
-        this.filePath = path.resolve(filePath);
+    constructor() {
         this.resourcesPath = path.join(__dirname, '../../res/md');
         this.distResourcesPath = path.join(__dirname, '../../res/dist');
         this.katexPath = path.join(__dirname, '../../node_modules/katex/dist');
@@ -54,13 +58,8 @@ export class MdServerCli {
         });
         res.write('data: {"type":"connected"}\n\n');
         this.sseClients.add(res);
-        req.on('close', () => {
-            this.sseClients.delete(res);
-            if (this.sseClients.size === 0) {
-                this.server.close();
-                process.exit(0);
-            }
-        });
+        // The daemon outlives its clients — closing the last tab must NOT stop the process.
+        req.on('close', () => { this.sseClients.delete(res); });
     }
 
     private handleGetRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -73,7 +72,17 @@ export class MdServerCli {
         let contentType: string;
 
         if (pathname === '/' || pathname === '/index.html') {
-            this.serveIndexHtml(url.searchParams.get('m') ?? 'dark', res);
+            const file = url.searchParams.get('f');
+            this.serveIndexHtml(file, url.searchParams.get('m') ?? 'dark', res);
+            return;
+        } else if (pathname === '/health') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, version: MD_VERSION }));
+            return;
+        } else if (pathname === '/quit') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Stopping');
+            this.stop();
             return;
         } else if (pathname === '/event') {
             this.handleSseRequest(req, res);
@@ -92,7 +101,7 @@ export class MdServerCli {
             contentType = 'text/css';
         } else {
             // Absolute filesystem path — used for .md files and images resolved by mdRenderer
-            filePath = pathname;
+            filePath = decodeURIComponent(pathname);
             contentType = this.getContentType(pathname);
         }
 
@@ -128,16 +137,35 @@ export class MdServerCli {
         return map[ext] ?? 'application/octet-stream';
     }
 
-    private serveIndexHtml(themeMode: string, res: http.ServerResponse): void {
+    private serveIndexHtml(file: string | null, themeMode: string, res: http.ServerResponse): void {
+        const absFile = file ? path.resolve(file) : '';
+        if (absFile) { this.ensureWatch(absFile); }
+
         const indexPath = path.join(this.resourcesPath, 'index.html');
         fs.readFile(indexPath, 'utf8', (err, data) => {
             if (err) { res.writeHead(500); res.end('Internal server error'); return; }
 
+            // The standalone daemon has no listener port, so the page's own EventSource stays off.
+            // Inject a self-contained SSE client: live-reload on `refresh` for this file, close on `close`.
             const configScript = `<script>
-        window.lutexMarkdownFile = '${this.filePath}';
-        window.lutexDefaultTheme = '${themeMode}';
+        window.lutexMarkdownFile = ${JSON.stringify(absFile)};
+        window.lutexDefaultTheme = ${JSON.stringify(themeMode)};
         const _es = new EventSource('/event');
-        _es.addEventListener('message', e => { try { if (JSON.parse(e.data).type === 'close') window.close(); } catch {} });
+        _es.addEventListener('message', e => {
+            try {
+                const d = JSON.parse(e.data);
+                if (d.type === 'close') { window.close(); return; }
+                if (d.type === 'refresh' && (!d.file || d.file === window.lutexMarkdownFile)) {
+                    try {
+                        const hs = [...document.querySelectorAll('h2, h3')];
+                        const a = hs.findLast(h => h.getBoundingClientRect().top <= 1);
+                        if (a) localStorage.setItem('mdScrollHeading', a.textContent.trim());
+                        else localStorage.removeItem('mdScrollHeading');
+                    } catch {}
+                    location.reload();
+                }
+            } catch {}
+        });
     </script>
     <script>`;
 
@@ -147,19 +175,59 @@ export class MdServerCli {
         });
     }
 
-    public broadcastShutdown(): void {
-        for (const client of this.sseClients) {
-            client.write('data: {"type":"close"}\n\n');
+    /** Watch a served file so on-disk edits push a `refresh` to open tabs. Idempotent per file. */
+    private ensureWatch(absFile: string): void {
+        if (this.watchers.has(absFile) || !fs.existsSync(absFile)) { return; }
+        try {
+            const watcher = fs.watch(absFile, () => {
+                const prev = this.debounce.get(absFile);
+                if (prev) { clearTimeout(prev); }
+                this.debounce.set(absFile, setTimeout(() => {
+                    this.debounce.delete(absFile);
+                    // Editors often replace the file (rename), which invalidates the watch — re-arm.
+                    if (!fs.existsSync(absFile)) { return; }
+                    if (!this.watchers.has(absFile)) { this.ensureWatch(absFile); }
+                    this.broadcast(JSON.stringify({ type: 'refresh', file: absFile }));
+                }, 50));
+            });
+            watcher.on('error', () => {
+                this.watchers.get(absFile)?.close();
+                this.watchers.delete(absFile);
+            });
+            this.watchers.set(absFile, watcher);
+        } catch {
+            // unwatchable path (e.g. deleted between checks) — ignore
         }
     }
 
-    public async start(): Promise<number> {
-        const port = await findAvailablePort();
+    private broadcast(message: string): void {
+        for (const client of this.sseClients) {
+            try { client.write(`data: ${message}\n\n`); }
+            catch { this.sseClients.delete(client); }
+        }
+    }
+
+    public broadcastShutdown(): void {
+        this.broadcast('{"type":"close"}');
+    }
+
+    public async start(port: number = MD_DAEMON_PORT): Promise<number> {
         return new Promise((resolve, reject) => {
             this.server.listen(port, 'localhost', () => {
                 this.port = port;
                 resolve(port);
             }).on('error', reject);
         });
+    }
+
+    /** Tell open tabs to close, then tear down the daemon. */
+    public stop(): void {
+        this.broadcastShutdown();
+        for (const w of this.watchers.values()) { w.close(); }
+        this.watchers.clear();
+        setTimeout(() => {
+            this.server.close();
+            process.exit(0);
+        }, 150);
     }
 }

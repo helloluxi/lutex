@@ -95,7 +95,7 @@ ln -sf "$(pwd)/out/cli/md.js" ~/.local/bin/md
 - `lutex tex|md|slides FILE` — open a preview against a running daemon (start one with `:LutexListen`).
 - `lutex slides-pdf FILE` — export slides to PDF (standalone; needs the `puppeteer` optional dep).
 - `lutex bibtex-clean FILE.bib` — clean a `.bib` from the shell (standalone, no daemon).
-- `md FILE.md` — no-editor markdown viewer (does not need nvim or a daemon).
+- `md FILE.md` — no-editor markdown viewer (does not need nvim). Backed by a shared daemon on port **9988**, started on first use and left running so repeat opens reuse one process; the file live-reloads on edit. `md --stop` stops it.
 
 ## Configuration (`.lutex.json`)
 
