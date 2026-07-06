@@ -613,11 +613,13 @@ export default class LutexArticle {
             mainContent = text;
         });
 
-        // Get listener port from global variable set by server
+        // The daemon serving this page has no notion of a listener, so `window.lutexListenerPort`
+        // is never injected server-side — fall back to the `?o=` URL param (nvim sets this itself).
         if (window.lutexListenerPort) {
             this.localHostPort = window.lutexListenerPort;
         } else {
-            this.localHostPort = 0; // No listener available
+            const o = new URLSearchParams(window.location.search).get('o');
+            this.localHostPort = o ? parseInt(o, 10) : 0;
         }
 
         // Parse %%github:<this.githubRepo>

@@ -3,8 +3,7 @@
   "description": "Live LaTeX / Markdown / Slides rendering with two-way Neovim navigation, plus a stable HTTP file-jump listener",
   "version": "0.1.0",
   "bin": {
-    "lutex": "./out/cli.js",
-    "md": "./out/cli/md.js"
+    "lutex": "./out/cli.js"
   },
   "repository": {
     "type": "git",
@@ -14,7 +13,6 @@
     "compile": "tsc -p ./tsconfig.json && tsc -p ./tsconfig.res.json",
     "compile:listener": "tsc -p ./tsconfig.json",
     "compile:res": "tsc -p ./tsconfig.res.json",
-    "compile:cli": "tsc -p ./tsconfig.cli.json",
     "watch": "tsc -watch -p ./tsconfig.json",
     "clean": "rimraf out res/dist"
   },

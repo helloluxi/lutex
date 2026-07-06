@@ -306,10 +306,25 @@ function setupScrollTracking() {
         }
     });
     
+    // ===== SAME-ORIGIN REFRESH =====
+    // The view daemon watches the served root itself, so this is always available regardless of
+    // whether a listener is attached.
+    const refreshEventSource = new EventSource('/event');
+    refreshEventSource.addEventListener('message', (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'refresh') {
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Error processing refresh event:', error);
+        }
+    });
+
     // ===== LISTENER INTEGRATION =====
-    // Only enable listener if 'o' parameter is present in URL (indicating VSCode launched server)
+    // Only enable listener if 'o' parameter is present in URL (indicating a `:LutexListen` daemon)
     const listenerPort = window.lutexListenerPort || lutex.localHostPort;
-    
+
     if (listenerPort && listenerPort !== 0) {
         console.log('[LuTeX] Listener integration enabled:', { listenerPort, hostname: window.location.hostname });
         // Use current hostname instead of hardcoding localhost for LAN support
@@ -376,18 +391,16 @@ function setupScrollTracking() {
             }
         });
         
-        // Set up auto-refresh listener
-        const eventSource = new EventSource(`http://${listenerHost}:${listenerPort}/event`);
-        eventSource.addEventListener('message', (event) => {
+        // Cursor-follow scroll — refresh is handled above via the same-origin channel.
+        const scrollEventSource = new EventSource(`http://${listenerHost}:${listenerPort}/event`);
+        scrollEventSource.addEventListener('message', (event) => {
             try {
                 const data = JSON.parse(event.data);
-                if (data.type === 'refresh') {
-                    location.reload();
-                } else if (data.type === 'scroll') {
+                if (data.type === 'scroll') {
                     scrollToElement(data.file, data.line);
                 }
             } catch (error) {
-                console.error('Error processing refresh event:', error);
+                console.error('Error processing listener event:', error);
             }
         });
     } else {
@@ -397,8 +410,9 @@ function setupScrollTracking() {
 
 // Setup localhost jump for equation labels
 function setupLocalhostJump() {
-    // Only enable if listener integration is available (indicated by lutexListenerPort)
-    const listenerPort = window.lutexListenerPort;
+    // Only enable if listener integration is available (window.lutexListenerPort or the `?o=`
+    // fallback, already resolved into lutex.localHostPort by LutexArticle.render()).
+    const listenerPort = window.lutexListenerPort || lutex.localHostPort;
     if (listenerPort && listenerPort !== 0) {
         // Add click handlers for equation numbers (KaTeX generates these)
         document.addEventListener('click', (e) => {

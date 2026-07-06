@@ -16,19 +16,29 @@ file ⇄ preview navigation. Driven by **Neovim** (msgpack-RPC) and a small `lut
 
 ## How it works
 
-One **daemon per Neovim instance** — a single localhost HTTP+SSE server, started by the shim and bound to
-that nvim's RPC socket.
+Two kinds of process:
 
-- **Jump contract** — `POST /jump {file,line,action}` moves the editor to `file:line` (`jump`) or toggles a
-  `[ ]` ⇄ `[x]` checkbox and saves (`check`). Other tools — a dashboard, a browser tab, an external
-  daemon — drive the editor through this stable contract.
-- **Preview** — the same daemon serves the rendered `.tex` / `.md` / slides HTML on its GET routes, so the
-  preview shares the daemon's origin. The page double-clicks back to `POST /jump`; the daemon pushes
-  scroll/refresh over SSE (`GET /event`) as you move the cursor or edit files.
-- **Neovim shim** (`lutex.nvim`) — starts the daemon bound to the running nvim and provides the editor
+- **View daemon** — one shared, long-lived process (fixed port, default **9999**, configurable) that
+  renders any `.tex` / `.md` / slides file for any workspace, by absolute path. It has no notion of
+  Neovim; it watches whatever it serves and pushes `refresh` over SSE (`GET /event`) on edit.
+  `lutex tex|md|slides` starts it automatically if it isn't already running; `lutex reload`/`stop`
+  manage its lifecycle directly.
+- **Listener** — one **per Neovim instance**, started by the shim and bound to that nvim's RPC socket.
+  - **Jump contract** — `POST /jump {file,line,action}` moves the editor to `file:line` (`jump`) or
+    toggles a `[ ]` ⇄ `[x]` checkbox and saves (`check`). Other tools — a dashboard, a browser tab, an
+    external daemon — drive the editor through this stable contract.
+  - **Scroll** — `POST /scroll {file,line}` pushes a cursor-follow event over SSE (`GET /event`) to
+    the browser preview.
+
+A preview opened from Neovim carries `?o=<listenerPort>` so the page can reach *this* nvim's listener
+for jump/scroll, cross-origin, alongside the view daemon's own origin; opened from a plain terminal
+there's no listener, and the page is a read-only preview.
+
+- **Neovim shim** (`lutex.nvim`) — starts the listener bound to the running nvim and provides the editor
   commands below. It spawns `node out/cli.js` by absolute path, so the nvim flow needs no global install.
-- **CLI** (`lutex`) — `listen | tex | md | slides | slides-pdf | bibtex-clean`. `listen` is the daemon;
-  `tex|md|slides` open the browser against a running daemon; `slides-pdf` and `bibtex-clean` run standalone.
+- **CLI** (`lutex`) — `listen | tex | md | slides | reload | stop | slides-pdf | bibtex-clean`.
+  `listen` starts the listener; `tex|md|slides` open the browser against the (auto-started) view
+  daemon; `reload`/`stop` manage the view daemon directly; `slides-pdf` and `bibtex-clean` run standalone.
 
 ## Install — Neovim (lazy.nvim)
 
@@ -43,8 +53,8 @@ that nvim's RPC socket.
 
 This lazy spec is the only thing you add to your own nvim config — and you own it, exactly like
 any other plugin. LuTeX never writes to `~/.config/nvim`; its code stays in `~/lutex`. `:LutexListen`
-starts the daemon bound to your current nvim; `:LutexStop` stops it. Set
-`setup({ autostart = "project" })` to auto-start only in projects holding a `.lutex.json` with
+starts the listener bound to your current nvim; `:LutexStop` stops it. Set
+`setup({ autostart = "project" })` to auto-start only in projects holding a `.lu/lutex.json` with
 `{ "autostart": true }`. Coexists with vimtex/lualine.
 
 To avoid editing your config entirely, load it ad-hoc instead — `:set rtp+=~/lutex | lua require('lutex').start()`,
@@ -54,8 +64,8 @@ or a project-local `.nvim.lua` (nvim's `exrc`) that calls `require('lutex').star
 
 | Command | Effect |
 |---------|--------|
-| `:LutexListen` / `:LutexStop` | Start / stop the daemon bound to this nvim |
-| `:LutexMd` / `:LutexSlides` / `:LutexTex` | Open the current file's browser preview as a notebook / slides / LaTeX (starts the daemon if needed) |
+| `:LutexListen` / `:LutexStop` | Start / stop the listener bound to this nvim |
+| `:LutexMd` / `:LutexSlides` / `:LutexTex` | Open the current file's browser preview as a notebook / slides / LaTeX (starts the shared view daemon if needed) |
 | `:LutexScroll` | Scroll the browser preview to the cursor line |
 | `:LutexInlineToDisplay` | Convert the visual selection (`$…$` or a `\begin{equation}` block) into a display-math block |
 
@@ -71,7 +81,7 @@ vim.keymap.set("n", "<leader>ls", "<Cmd>LutexScroll<CR>",       { desc = "scroll
 
 ### lualine indicator (optional)
 
-`require('lutex').status()` returns `"lutex:<port>"` while the daemon runs, `""` otherwise — drop it into a
+`require('lutex').status()` returns `"lutex:<port>"` while the listener runs, `""` otherwise — drop it into a
 section:
 
 ```lua
@@ -82,48 +92,53 @@ require("lualine").setup({
 
 ## CLI on the terminal
 
-The nvim shim needs no global install, but the renderer subcommands and the standalone viewers do. Build,
-then symlink the bins onto your `PATH`:
+The nvim shim needs no global install, but the terminal subcommands do. Build, then symlink `lutex`
+onto your `PATH`:
 
 ```bash
-pnpm install && pnpm run compile && pnpm run compile:cli
+pnpm install && pnpm run compile
 mkdir -p ~/.local/bin
-ln -sf "$(pwd)/out/cli.js"    ~/.local/bin/lutex
-ln -sf "$(pwd)/out/cli/md.js" ~/.local/bin/md
+ln -sf "$(pwd)/out/cli.js" ~/.local/bin/lutex
 ```
 
-- `lutex tex|md|slides FILE` — open a preview against a running daemon (start one with `:LutexListen`).
+- `lutex tex|md|slides FILE` — open a preview. Auto-starts the shared view daemon (default port
+  **9999**) if it isn't already running, no editor needed. Pass `--listener PORT` to attach a
+  running `:LutexListen` daemon for jump/scroll (nvim does this itself); `--dump` (slides only)
+  writes static `dist/`+`index.html` next to the file.
+- `lutex reload` — restart the view daemon, e.g. after a rebuild or a config change.
+- `lutex stop` — stop the view daemon.
 - `lutex slides-pdf FILE` — export slides to PDF (standalone; needs the `puppeteer` optional dep).
 - `lutex bibtex-clean FILE.bib` — clean a `.bib` from the shell (standalone, no daemon).
-- `md FILE.md` — no-editor markdown viewer (does not need nvim). Backed by a shared daemon on port **9988**, started on first use and left running so repeat opens reuse one process; the file live-reloads on edit. `md --stop` stops it.
 
-## Configuration (`.lutex.json`)
+## Configuration (`~/.lu/lutex.json`)
 
-Options resolve by precedence — **CLI flags > project `.lutex.json` > `~/.config/lutex/config.json` >
-built-in defaults.** The project file is the nearest `.lutex.json` found at or above the working directory;
-the global file also honours `$XDG_CONFIG_HOME`.
+Options resolve by precedence — **CLI flags > project `.lu/lutex.json` > `~/.lu/lutex.json` >
+built-in defaults.** The project file is the nearest `.lu/lutex.json` found at or above the working
+directory.
 
 | Key | Type | Default | Effect |
 |-----|------|---------|--------|
-| `port` | number | `12023` | Listener port (auto-increments if busy) |
+| `viewPort` | number | `9999` | Shared view daemon port (`lutex tex\|md\|slides\|reload\|stop`) |
+| `port` | number | `12023` | Listener port (`lutex listen`; auto-increments if busy) — unrelated to `viewPort` |
 | `nvimSocket` | string | — | nvim RPC socket to attach to (the shim passes this automatically) |
-| `allowLAN` | boolean | `false` | Bind `0.0.0.0` instead of `127.0.0.1` |
-| `autostart` | boolean | `false` | With `setup({ autostart = "project" })`, auto-start the daemon in this project |
+| `allowLAN` | boolean | `false` | Bind `0.0.0.0` instead of `127.0.0.1` for the listener |
+| `autostart` | boolean | `false` | With `setup({ autostart = "project" })`, auto-start the listener in this project |
 | `theme` | `"light"` \| `"dark"` | `"dark"` | Preview theme |
 | `katexMacros` | object | — | KaTeX macro map passed to the renderer |
 
-Example project `.lutex.json`:
+Example project `.lu/lutex.json`:
 
 ```json
 {
-  "port": 12030,
+  "viewPort": 9999,
   "autostart": true,
   "theme": "dark",
   "katexMacros": { "\\RR": "\\mathbb{R}" }
 }
 ```
 
-`--port`, `--nvim`, and `--allow-lan` on `lutex listen` override the file values for that run.
+`--port`, `--nvim`, and `--allow-lan` on `lutex listen` override the file values for that run;
+`--port` on `lutex tex|md|slides|reload|stop` overrides `viewPort`.
 
 ## Jump contract (stable)
 
@@ -136,4 +151,5 @@ Example project `.lutex.json`:
 - `file` — absolute preferred; relative resolved against the editor's cwd.
 - `action` — `"jump"` (default) or `"check"`.
 - Response `200 "Success"`; `4xx` on bad input; connection-refused if not running.
-- Optional SSE: `GET /event` (`connected` / `refresh` / `scroll` / `close`). CORS `*`, localhost only.
+- Optional SSE: `GET /event` (`connected` / `scroll`). CORS `*`, localhost only. The view daemon has
+  its own, separate `GET /event` (`connected` / `refresh` / `close`) for the preview's own live-reload.

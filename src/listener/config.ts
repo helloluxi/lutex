@@ -4,6 +4,7 @@ import * as os from 'os';
 
 export interface Config {
     port: number;
+    viewPort?: number;
     nvimSocket?: string;
     allowLAN: boolean;
     autostart?: boolean | 'project';
@@ -16,14 +17,17 @@ export interface RendererOptions {
     file?: string;        // absolute path of the source file, if one was given
     root: string;         // source root advertised to the daemon (used by tex's relative fetches)
     theme: string;
-    daemonPort: number;   // the daemon/listener port to open the preview against
+    daemonPort: number;   // the view daemon's port to open the preview against
+    listenerPort?: number; // nvim listener port to embed as `?o=`, if any
+    dump: boolean;         // slides-only: whether to dump static assets into the served folder
+    katexMacros?: Record<string, string>;
 }
 
-const DEFAULTS = { port: 12023, allowLAN: false, theme: 'dark' };
+const DEFAULTS = { port: 12023, viewPort: 9999, allowLAN: false, theme: 'dark' };
 
 /**
  * Resolve the effective config by precedence:
- *   CLI flags > project-local `.lutex.json` (nearest above cwd) > `~/.config/lutex/config.json` > defaults.
+ *   CLI flags > project-local `.lu/lutex.json` (nearest above cwd) > `~/.lu/lutex.json` > defaults.
  * @param args  listener flags (everything after `lutex listen`): `--port N`, `--nvim SOCK`, `--allow-lan`.
  * @param cwd   directory to start the project-config walk from.
  */
@@ -34,6 +38,7 @@ export function resolveConfig(args: string[], cwd: string): Config {
 
     return {
         port: cli.port ?? project.port ?? global.port ?? DEFAULTS.port,
+        viewPort: cli.viewPort ?? project.viewPort ?? global.viewPort,
         nvimSocket: cli.nvimSocket ?? project.nvimSocket ?? global.nvimSocket,
         allowLAN: cli.allowLAN ?? project.allowLAN ?? global.allowLAN ?? DEFAULTS.allowLAN,
         autostart: project.autostart ?? global.autostart,
@@ -45,6 +50,7 @@ export function resolveConfig(args: string[], cwd: string): Config {
 interface ParsedFlags extends Partial<Config> {
     root?: string;
     listenerPort?: number;
+    dump?: boolean;
 }
 
 function parseCliFlags(args: string[]): ParsedFlags {
@@ -69,6 +75,8 @@ function parseCliFlags(args: string[]): ParsedFlags {
             out.listenerPort = toPort(args[++i]);
         } else if (a.startsWith('--listener=')) {
             out.listenerPort = toPort(a.slice('--listener='.length));
+        } else if (a === '--dump') {
+            out.dump = true;
         } else if (a === '--theme' || a === '-m') {
             out.theme = args[++i];
         } else if (a.startsWith('--theme=')) {
@@ -83,11 +91,11 @@ function toPort(value: string | undefined): number | undefined {
     return Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
-/** Walk up from `startDir` returning the first `.lutex.json` found, or null. */
+/** Walk up from `startDir` returning the first `.lu/lutex.json` found, or null. */
 function findProjectConfig(startDir: string): string | null {
     let dir = path.resolve(startDir);
     for (;;) {
-        const candidate = path.join(dir, '.lutex.json');
+        const candidate = path.join(dir, '.lu', 'lutex.json');
         if (fs.existsSync(candidate)) {
             return candidate;
         }
@@ -100,8 +108,7 @@ function findProjectConfig(startDir: string): string | null {
 }
 
 function globalConfigPath(): string {
-    const base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-    return path.join(base, 'lutex', 'config.json');
+    return path.join(os.homedir(), '.lu', 'lutex.json');
 }
 
 function readJsonConfig(file: string | null): Partial<Config> {
@@ -113,6 +120,9 @@ function readJsonConfig(file: string | null): Partial<Config> {
         const out: Partial<Config> = {};
         if (typeof raw.port === 'number') {
             out.port = raw.port;
+        }
+        if (typeof raw.viewPort === 'number') {
+            out.viewPort = raw.viewPort;
         }
         if (typeof raw.nvimSocket === 'string') {
             out.nvimSocket = raw.nvimSocket;
@@ -138,8 +148,9 @@ function readJsonConfig(file: string | null): Partial<Config> {
 /**
  * Resolve a renderer launcher's options from its args (after `lutex <kind>`) and the config files.
  * Positional `[file]` is resolved to an absolute path; `root` defaults to the file's directory
- * (or cwd when no file). Theme falls back to project/global config then default; `daemonPort` is the
- * listener port to open the preview against (`--port`/`--listener`, default 12023).
+ * (or cwd when no file). `daemonPort` is the shared view daemon's port (`--port`, config `viewPort`,
+ * default 9999) — unrelated to `listenerPort` (`--listener`/`-o`), which is only embedded in the
+ * page URL as `?o=` for nvim jump/scroll integration and otherwise left unset.
  */
 export function resolveRendererOptions(args: string[], cwd: string): RendererOptions {
     const cli = parseCliFlags(args);
@@ -155,11 +166,14 @@ export function resolveRendererOptions(args: string[], cwd: string): RendererOpt
         file,
         root,
         theme: cli.theme ?? fileConfig.theme ?? DEFAULTS.theme,
-        daemonPort: cli.port ?? cli.listenerPort ?? DEFAULTS.port,
+        daemonPort: cli.port ?? fileConfig.viewPort ?? DEFAULTS.viewPort,
+        listenerPort: cli.listenerPort,
+        dump: cli.dump ?? false,
+        katexMacros: fileConfig.katexMacros,
     };
 }
 
-/** Project `.lutex.json` then XDG global, merged (project wins). */
+/** Project `.lu/lutex.json` then global `~/.lu/lutex.json`, merged (project wins). */
 function mergeFileConfig(cwd: string): Partial<Config> {
     const project = readJsonConfig(findProjectConfig(cwd));
     const global = readJsonConfig(globalConfigPath());

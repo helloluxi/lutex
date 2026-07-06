@@ -342,8 +342,8 @@
           // Allow URL params fallback when not injected by server
           const urlParams = new URLSearchParams(window.location.search);
           if (typeof window.lutexMarkdownFile === 'undefined') {
-            const f = urlParams.get('f');
-            if (f) { window.lutexMarkdownFile = f; }
+            const file = urlParams.get('file');
+            if (file) { window.lutexMarkdownFile = file; }
           }
           if (typeof window.lutexListenerPort === 'undefined') {
             const o = urlParams.get('o');
@@ -416,24 +416,35 @@
         if (typeof katex !== 'undefined' && typeof renderMathInElement !== 'undefined') {
           window.slidesApp = new SlidesApp();
           
-          // Set up auto-refresh listener if listener port is provided
-          const listenerPort = window.lutexListenerPort;
+          // Same-origin refresh/close channel — the view daemon watches the served file itself, so
+          // this is always available regardless of whether a listener is attached.
+          const refreshEventSource = new EventSource('/event');
+          refreshEventSource.addEventListener('message', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'refresh') {
+                // Save current slide before refresh
+                const currentSlide = window.slidesApp.getCurrentSlide();
+                localStorage.setItem('slidesCurrentSlide', currentSlide.toString());
+                location.reload();
+              } else if (data.type === 'close') {
+                // Server is shutting down, close the window/tab
+                window.close();
+              }
+            } catch (error) {
+              console.error('Error processing event:', error);
+            }
+          });
 
+          // Cursor-follow scroll only exists when a `:LutexListen` daemon is attached via `?o=`.
+          const listenerPort = window.lutexListenerPort;
           if (listenerPort) {
             const listenerHost = window.location.hostname;
-            const eventSource = new EventSource(`http://${listenerHost}:${listenerPort}/event`);
-            eventSource.addEventListener('message', (event) => {
+            const scrollEventSource = new EventSource(`http://${listenerHost}:${listenerPort}/event`);
+            scrollEventSource.addEventListener('message', (event) => {
               try {
                 const data = JSON.parse(event.data);
-                if (data.type === 'refresh') {
-                  // Save current slide before refresh
-                  const currentSlide = window.slidesApp.getCurrentSlide();
-                  localStorage.setItem('slidesCurrentSlide', currentSlide.toString());
-                  location.reload();
-                } else if (data.type === 'close') {
-                  // Server is shutting down, close the window/tab
-                  window.close();
-                } else if (data.type === 'scroll') {
+                if (data.type === 'scroll') {
                   // Jump to the slide that best matches the requested source line
                   const targetLine = parseInt(data.line, 10);
                   const slides = Array.from(document.querySelectorAll('.slide'));
@@ -452,7 +463,7 @@
                   }
                 }
               } catch (error) {
-                console.error('Error processing event:', error);
+                console.error('Error processing listener event:', error);
               }
             });
           }

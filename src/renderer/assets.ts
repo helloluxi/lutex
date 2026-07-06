@@ -36,21 +36,34 @@ function isRendererKind(value: string | null): value is RendererKind {
     return value === 'tex' || value === 'md' || value === 'slides';
 }
 
+/** Parse the `?macros=` query param (a JSON object); malformed or absent input yields undefined. */
+function parseMacros(raw: string | null): Record<string, string> | undefined {
+    if (!raw) {
+        return undefined;
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 interface IndexConfig {
     file?: string;
-    listenerPort: number | null;
     theme: string | null;
     macros?: Record<string, string>;
 }
 
-/** Inject the `window.lutex*` config before the first `<script>` (JSON.stringify guards quotes). */
+/**
+ * Inject the `window.lutex*` config before the first `<script>` (JSON.stringify guards quotes).
+ * Listener integration (`window.lutexListenerPort`) is deliberately not injected here — the daemon
+ * serving this page has no notion of a listener; pages fall back to parsing `?o=` themselves.
+ */
 function injectIndex(template: string, cfg: IndexConfig): string {
     let script = '<script>\n';
     if (cfg.file) {
         script += `        window.lutexMarkdownFile = ${JSON.stringify(cfg.file)};\n`;
-    }
-    if (cfg.listenerPort) {
-        script += `        window.lutexListenerPort = ${cfg.listenerPort};\n`;
     }
     if (cfg.theme) {
         script += `        window.lutexDefaultTheme = ${JSON.stringify(cfg.theme)};\n`;
@@ -63,10 +76,6 @@ function injectIndex(template: string, cfg: IndexConfig): string {
 }
 
 export interface AssetResponderDeps {
-    /** KaTeX macros injected as `window.lutexKatexMacros` (omitted → page uses its defaults). */
-    macros?: Record<string, string>;
-    /** Port to advertise as `window.lutexListenerPort`; null disables browser↔daemon integration. */
-    listenerPort: () => number | null;
     log: (msg: string) => void;
     /** Called when a new source root is registered (the daemon uses it to start a file watcher). */
     onRootAdded?: (dir: string) => void;
@@ -138,7 +147,7 @@ export class AssetResponder {
         } else if (file) {
             const dir = path.dirname(file);
             this.addRoot(dir);
-            if (kind === 'slides') {
+            if (kind === 'slides' && params.get('dump') === '1') {
                 this.dumpSlidesStatic(path.resolve(dir));
             }
         }
@@ -152,9 +161,8 @@ export class AssetResponder {
             }
             const html = injectIndex(data, {
                 file,
-                listenerPort: this.deps.listenerPort(),
                 theme: params.get('m'),
-                macros: this.deps.macros,
+                macros: parseMacros(params.get('macros')),
             });
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(html);
@@ -230,10 +238,9 @@ export class AssetResponder {
 export async function startStandaloneRenderer(opts: {
     root: string;
     hostname?: string;
-    macros?: Record<string, string>;
     log: (msg: string) => void;
 }): Promise<{ port: number; stop: () => void }> {
-    const responder = new AssetResponder({ macros: opts.macros, listenerPort: () => null, log: opts.log });
+    const responder = new AssetResponder({ log: opts.log });
     responder.addRoot(opts.root);
 
     const server = http.createServer((req, res) => {

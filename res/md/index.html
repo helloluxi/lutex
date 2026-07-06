@@ -43,6 +43,14 @@
             delete window.lutexDefaultTheme;
         }
 
+        // Listener integration is optional: the daemon serving this page has no notion of a
+        // listener, so fall back to the `?o=` URL param (nvim sets this when it opens the page).
+        function resolveListenerPort() {
+            if (window.lutexListenerPort) return window.lutexListenerPort;
+            const o = urlParams.get('o');
+            return o ? parseInt(o, 10) : 0;
+        }
+
         // Get KaTeX macros from configuration or use defaults
         const katexMacros = window.lutexKatexMacros || {
             "\\ket": "\\lvert #1 \\rangle",
@@ -66,7 +74,7 @@
 
         // Setup click handler for file links when listener port is active
         function setupLinkClickHandler() {
-            const listenerPort = window.lutexListenerPort;
+            const listenerPort = resolveListenerPort();
             if (!listenerPort || listenerPort === 0) return;
 
             const listenerHost = window.location.hostname;
@@ -143,8 +151,8 @@
 
         // Setup double-click handler for jumping to source
         function setupDoubleClickHandler() {
-            const listenerPort = window.lutexListenerPort;
-            
+            const listenerPort = resolveListenerPort();
+
             if (listenerPort && listenerPort !== 0) {
                 console.log('[LuTeX] Listener integration enabled:', { listenerPort, hostname: window.location.hostname });
                 const listenerHost = window.location.hostname;
@@ -218,35 +226,46 @@
             }
         });
 
-        // Set up auto-refresh listener when listener port is configured
-        const listenerPort = window.lutexListenerPort;
+        // Same-origin refresh/close channel — the view daemon watches the served file itself, so
+        // this is always available regardless of whether a listener is attached.
+        const refreshEventSource = new EventSource('/event');
+        refreshEventSource.addEventListener('message', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'refresh') {
+                    const thisFile = window.lutexMarkdownFile || 'main.md';
+                    if (data.file && data.file !== thisFile) return;
+                    // Save current h2/h3 section before reloading
+                    const headings = [...document.querySelectorAll('h2, h3')];
+                    const active = headings.findLast(h => h.getBoundingClientRect().top <= 1);
+                    if (active) {
+                        localStorage.setItem('mdScrollHeading', active.textContent.trim());
+                    } else {
+                        localStorage.removeItem('mdScrollHeading');
+                    }
+                    location.reload();
+                } else if (data.type === 'close') {
+                    // Server is shutting down, close the window/tab
+                    window.close();
+                }
+            } catch (error) {
+                console.error('Error processing event:', error);
+            }
+        });
 
-        if (listenerPort) {
-            const eventSource = new EventSource(`http://${window.location.hostname}:${listenerPort}/event`);
-            eventSource.addEventListener('message', (event) => {
+        // Cursor-follow scroll only exists when a `:LutexListen` daemon is attached via `?o=`.
+        const scrollListenerPort = resolveListenerPort();
+        if (scrollListenerPort) {
+            const scrollEventSource = new EventSource(`http://${window.location.hostname}:${scrollListenerPort}/event`);
+            scrollEventSource.addEventListener('message', (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'refresh') {
-                        const thisFile = window.lutexMarkdownFile || 'main.md';
-                        if (data.file && data.file !== thisFile) return;
-                        // Save current h2/h3 section before reloading
-                        const headings = [...document.querySelectorAll('h2, h3')];
-                        const active = headings.findLast(h => h.getBoundingClientRect().top <= 1);
-                        if (active) {
-                            localStorage.setItem('mdScrollHeading', active.textContent.trim());
-                        } else {
-                            localStorage.removeItem('mdScrollHeading');
-                        }
-                        location.reload();
-                    } else if (data.type === 'close') {
-                        // Server is shutting down, close the window/tab
-                        window.close();
-                    } else if (data.type === 'scroll') {
+                    if (data.type === 'scroll') {
                         // Handle scroll requests
                         console.log('Scroll event received:', data);
                     }
                 } catch (error) {
-                    console.error('Error processing event:', error);
+                    console.error('Error processing listener event:', error);
                 }
             });
         }

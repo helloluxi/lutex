@@ -107,9 +107,10 @@ function M.status()
   return ''
 end
 
--- Open the browser preview for the current buffer in the given view ('md' | 'slides' | 'tex'),
--- starting the daemon first if it is not already running. The probe + browser-open is delegated to
--- the CLI launcher (`lutex <kind>`), which builds the same-origin URL against the daemon port.
+-- Open the browser preview for the current buffer in the given view ('md' | 'slides' | 'tex').
+-- The CLI launcher (`lutex <kind>`) always targets the shared view daemon (auto-started if needed);
+-- we pass --listener so the page can reach *this* nvim's jump/scroll listener via `?o=`, and --dump
+-- for slides so editor-driven authoring keeps writing static dist/+index.html next to the file.
 function M.open(kind)
   local file = vim.api.nvim_buf_get_name(0)
   if file == '' then
@@ -118,7 +119,11 @@ function M.open(kind)
   end
 
   local function launch()
-    vim.system({ 'node', cli_path(), kind, file, '--port', tostring(state.port) }, { text = true }, function(res)
+    local cmd = { 'node', cli_path(), kind, file, '--listener', tostring(state.port) }
+    if kind == 'slides' then
+      table.insert(cmd, '--dump')
+    end
+    vim.system(cmd, { text = true }, function(res)
       if res.code ~= 0 then
         vim.schedule(function()
           vim.notify('[lutex] open failed: ' .. vim.trim(res.stderr or ''), vim.log.levels.ERROR)

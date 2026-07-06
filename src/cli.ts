@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'path';
-import * as http from 'http';
 import { execSync } from 'child_process';
 import { NvimController } from './listener/nvim';
 import { ListenerServer } from './listener/server';
@@ -8,16 +7,26 @@ import { resolveConfig, resolveRendererOptions, RendererOptions } from './listen
 import { RendererKind, startStandaloneRenderer } from './renderer/assets';
 import { exportSlidesPdf } from './renderer/slidesPdf';
 import { cleanBibtexFile, findSimilarPairs } from './lib/bibtexClean';
+import { ensureViewDaemon, reloadViewDaemon, stopViewDaemon } from './renderer/viewServer';
 
 function usage(): void {
     console.error(`Usage: lutex <command> [options]
 
 Commands:
   listen [--port N] [--nvim SOCK] [--allow-lan]
-            Start the daemon bound to a running nvim (jump listener + renderer + SSE on one port).
+            Start the nvim jump/scroll listener bound to this nvim instance (default port 12023).
 
-  tex | md | slides [file] [--root DIR] [--theme light|dark] [--port N]
-            Open a browser preview against the daemon (default port 12023). Run :LutexListen first.
+  tex | md | slides [file] [--root DIR] [--theme light|dark] [--port N] [--listener N] [--dump]
+            Open a browser preview against the shared view daemon (default port 9999, auto-started
+            if not already running). --listener N embeds ?o=N so the page can reach a running
+            \`:LutexListen\` for jump/scroll (nvim passes this itself). --dump (slides only) writes
+            static dist/+index.html next to the file.
+
+  reload [--port N]
+            Restart the shared view daemon — e.g. after a rebuild or a config change.
+
+  stop [--port N]
+            Stop the shared view daemon.
 
   slides-pdf <file.md> [--res WxH] [--out FILE] [--chrome PATH] [--date STR]
             Export a slides deck to a multi-page PDF (needs puppeteer + system Chrome).
@@ -50,7 +59,7 @@ async function runListen(argv: string[]): Promise<void> {
     }
 
     const nvim = new NvimController(socket);
-    const server = new ListenerServer({ nvim, log, macros: cfg.katexMacros });
+    const server = new ListenerServer({ nvim, log });
     const hostname = cfg.allowLAN ? '0.0.0.0' : '127.0.0.1';
 
     const port = await server.start(cfg.port, hostname);
@@ -66,19 +75,6 @@ async function runListen(argv: string[]): Promise<void> {
     process.on('SIGTERM', shutdown);
 }
 
-/** Probe whether a daemon is accepting connections on the given port. */
-function daemonAlive(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-        const req = http.request({ hostname: '127.0.0.1', port, path: '/', method: 'OPTIONS', timeout: 800 }, res => {
-            res.resume();
-            resolve(true);
-        });
-        req.on('error', () => resolve(false));
-        req.on('timeout', () => { req.destroy(); resolve(false); });
-        req.end();
-    });
-}
-
 /** The page-relative `f` value: absolute for markdown/slides, none for tex (which hardcodes main.tex). */
 function fileParam(kind: RendererKind, opts: RendererOptions): string | undefined {
     return kind === 'tex' ? undefined : opts.file;
@@ -87,8 +83,10 @@ function fileParam(kind: RendererKind, opts: RendererOptions): string | undefine
 async function runRenderer(kind: RendererKind, argv: string[]): Promise<void> {
     const opts = resolveRendererOptions(argv.slice(3), process.cwd());
 
-    if (!(await daemonAlive(opts.daemonPort))) {
-        console.error(`[lutex] no daemon on :${opts.daemonPort}. Run :LutexListen in nvim (or pass --port).`);
+    try {
+        await ensureViewDaemon(opts.daemonPort);
+    } catch (err) {
+        console.error(`[lutex] ${(err as Error).message}`);
         process.exit(1);
     }
 
@@ -100,10 +98,31 @@ async function runRenderer(kind: RendererKind, argv: string[]): Promise<void> {
     if (f) {
         query.set('file', f);
     }
+    if (opts.listenerPort) {
+        query.set('o', String(opts.listenerPort));
+    }
+    if (opts.dump) {
+        query.set('dump', '1');
+    }
+    if (opts.katexMacros) {
+        query.set('macros', JSON.stringify(opts.katexMacros));
+    }
     const url = `http://127.0.0.1:${opts.daemonPort}/?${query.toString()}`;
 
     console.log(url);
     openBrowser(url);
+}
+
+async function runReload(argv: string[]): Promise<void> {
+    const { daemonPort } = resolveRendererOptions(argv.slice(3), process.cwd());
+    await reloadViewDaemon(daemonPort);
+    console.log(`reloaded on :${daemonPort}`);
+}
+
+async function runStop(argv: string[]): Promise<void> {
+    const { daemonPort } = resolveRendererOptions(argv.slice(3), process.cwd());
+    const stopped = await stopViewDaemon(daemonPort);
+    console.log(stopped ? `stopped :${daemonPort}` : `not running on :${daemonPort}`);
 }
 
 function parseResolution(value: string | undefined): { width: number; height: number } {
@@ -200,6 +219,12 @@ async function main(): Promise<void> {
         case 'md':
         case 'slides':
             await runRenderer(cmd, process.argv);
+            break;
+        case 'reload':
+            await runReload(process.argv);
+            break;
+        case 'stop':
+            await runStop(process.argv);
             break;
         case 'slides-pdf':
             await runSlidesPdf(process.argv);
