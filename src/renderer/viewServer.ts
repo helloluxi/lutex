@@ -88,7 +88,7 @@ export class ViewServerCli {
 
     public start(port: number): Promise<number> {
         return new Promise((resolve, reject) => {
-            this.server.listen(port, 'localhost', () => resolve(port)).on('error', reject);
+            this.server.listen(port, '127.0.0.1', () => resolve(port)).on('error', reject);
         });
     }
 
@@ -106,7 +106,7 @@ export class ViewServerCli {
 /** GET a daemon endpoint, resolving null if it is unreachable within the timeout. */
 function probe(port: number, pathname: string, timeoutMs = 500): Promise<{ status: number; body: string } | null> {
     return new Promise((resolve) => {
-        const req = http.get({ host: 'localhost', port, path: pathname, timeout: timeoutMs }, (res) => {
+        const req = http.get({ host: '127.0.0.1', port, path: pathname, timeout: timeoutMs }, (res) => {
             let body = '';
             res.on('data', c => { body += c; });
             res.on('end', () => resolve({ status: res.statusCode ?? 0, body }));
